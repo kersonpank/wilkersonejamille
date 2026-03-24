@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { randomUUID } from 'crypto';
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
@@ -46,7 +47,10 @@ async function startServer() {
         notification_url: `${process.env.APP_URL}/api/webhook/mercadopago`,
       };
       
-      const response = await payment.create({ body });
+      const response = await payment.create({
+        body,
+        requestOptions: { idempotencyKey: randomUUID() },
+      });
       res.status(201).json({
         status: response.status,
         status_detail: response.status_detail,
