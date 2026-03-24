@@ -74,7 +74,15 @@ async function startServer() {
 
         // Fetch the latest payment status from Mercado Pago
         const payment = new Payment(client);
-        const paymentData = await payment.get({ id: paymentId });
+        let paymentData;
+        try {
+          paymentData = await payment.get({ id: paymentId });
+        } catch (mpError: any) {
+          // Payment not found (e.g. test simulation with fake ID) — acknowledge and ignore
+          console.log(`Payment ${paymentId} not found in MP API (possibly a test simulation): ${mpError?.message}`);
+          res.status(200).send("OK");
+          return;
+        }
 
         const newStatus = paymentData.status;
         const netAmount = paymentData.transaction_details?.net_received_amount ?? null;
