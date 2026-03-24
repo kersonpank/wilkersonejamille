@@ -27,6 +27,7 @@ export function Admin() {
   });
 
   const [activeTab, setActiveTab] = useState<'gifts' | 'payments'>('gifts');
+  const [giftsSubTab, setGiftsSubTab] = useState<'manage' | 'contributors'>('manage');
   const [contributions, setContributions] = useState<any[]>([]);
   const [isClearingHistory, setIsClearingHistory] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -284,6 +285,74 @@ export function Admin() {
         </div>
 
         {activeTab === 'gifts' ? (
+          <div>
+            {/* Sub-tabs */}
+            <div className="flex gap-6 mb-8 border-b border-[var(--color-nude-dark)]">
+              <button
+                onClick={() => setGiftsSubTab('manage')}
+                className={`pb-3 text-sm font-medium transition-colors relative ${giftsSubTab === 'manage' ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-light)] hover:text-[var(--color-ink)]'}`}
+              >
+                Gerenciar Lista
+                {giftsSubTab === 'manage' && <motion.div layoutId="giftsSubTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--color-sage-dark)]" />}
+              </button>
+              <button
+                onClick={() => setGiftsSubTab('contributors')}
+                className={`pb-3 text-sm font-medium transition-colors relative ${giftsSubTab === 'contributors' ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-light)] hover:text-[var(--color-ink)]'}`}
+              >
+                Presenteadores
+                {contributions.filter(c => c.status === 'approved').length > 0 && (
+                  <span className="ml-2 px-1.5 py-0.5 bg-[var(--color-sage)] text-white text-xs rounded-full">
+                    {contributions.filter(c => c.status === 'approved').length}
+                  </span>
+                )}
+                {giftsSubTab === 'contributors' && <motion.div layoutId="giftsSubTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--color-sage-dark)]" />}
+              </button>
+            </div>
+
+            {giftsSubTab === 'contributors' ? (
+              <div className="space-y-4">
+                {contributions.filter(c => c.status === 'approved').length === 0 ? (
+                  <div className="text-center py-16 text-[var(--color-ink-light)] border-2 border-dashed border-[var(--color-nude-dark)] rounded-2xl">
+                    Nenhum presente confirmado ainda.
+                  </div>
+                ) : (
+                  contributions
+                    .filter(c => c.status === 'approved')
+                    .map(c => {
+                      const gift = gifts.find(g => g.id === c.giftId);
+                      return (
+                        <div key={c.id} className="bg-white rounded-2xl p-4 shadow-sm border border-[var(--color-nude-dark)] flex gap-4 items-center">
+                          {gift?.imageUrl && (
+                            <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-50 shrink-0">
+                              <img src={gift.imageUrl} alt={gift.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-[var(--color-ink)] truncate">{gift?.title ?? `Presente #${c.giftId}`}</p>
+                            <p className="text-sm text-[var(--color-ink-light)] mt-0.5">
+                              de <strong>{c.guestName}</strong>
+                              {c.message && <span className="italic"> — "{c.message}"</span>}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="font-serif text-lg text-[var(--color-sage-dark)]">
+                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(c.amount)}
+                            </p>
+                            {c.netAmount != null && (
+                              <p className="text-xs text-green-600">
+                                líquido: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(c.netAmount)}
+                              </p>
+                            )}
+                            <p className="text-xs text-[var(--color-ink-light)] mt-0.5">
+                              {c.createdAt?.toDate ? new Date(c.createdAt.toDate()).toLocaleDateString('pt-BR') : ''}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })
+                )}
+              </div>
+            ) : (
           <div className="grid lg:grid-cols-[1fr_400px] gap-12">
             {/* Left Column: Add Gift Form */}
             <div className="space-y-8">
@@ -451,6 +520,8 @@ export function Admin() {
                 )}
               </div>
             </div>
+          </div>
+            )}
           </div>
         ) : (
           <div className="space-y-8">
