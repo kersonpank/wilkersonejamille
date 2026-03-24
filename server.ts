@@ -117,6 +117,40 @@ async function startServer() {
 
           await batch.commit();
           console.log(`Updated payment ${paymentId} to status ${newStatus}`);
+
+          // Send external notification webhook when payment is approved
+          if (newStatus === 'approved') {
+            try {
+              const settingsDoc = await db.collection('settings').doc('notifications').get();
+              const notifyUrl = settingsDoc.data()?.webhookUrl as string | undefined;
+              if (notifyUrl) {
+                const guestName = snapshot.docs[0]?.data().guestName ?? '';
+                const giftIds = [...new Set(snapshot.docs.map(d => d.data().giftId as string))];
+                const giftTitles = await Promise.all(
+                  giftIds.map(async id => {
+                    const gDoc = await db.collection('gifts').doc(id).get();
+                    return (gDoc.data()?.title as string) ?? id;
+                  })
+                );
+                await fetch(notifyUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    event: 'payment.approved',
+                    paymentId: String(paymentId),
+                    guestName,
+                    amount: snapshot.docs[0]?.data().amount ?? 0,
+                    netAmount,
+                    gifts: giftTitles,
+                    timestamp: new Date().toISOString(),
+                  }),
+                });
+                console.log(`Notification sent to ${notifyUrl}`);
+              }
+            } catch (notifyErr) {
+              console.error('Notification webhook error:', notifyErr);
+            }
+          }
         } else {
           console.log(`Payment ${paymentId} not found in Firestore`);
         }

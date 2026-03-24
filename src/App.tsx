@@ -8,6 +8,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { Home } from './pages/Home';
 import { Gifts } from './pages/Gifts';
 import { Admin } from './pages/Admin';
+import { EventPage } from './pages/EventPage';
 import { Toaster } from 'sonner';
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/presentes" element={<Gifts />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/:slug" element={<EventPage />} />
         </Routes>
       </Router>
       <Toaster position="bottom-center" richColors />

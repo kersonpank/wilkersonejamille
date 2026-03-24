@@ -132,16 +132,39 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    function isValidRsvp() {
+      return hasRequiredFields(['eventId', 'eventSlug', 'firstName', 'lastName', 'whatsapp', 'createdAt']) &&
+             validStringLength('firstName', 1, 100) &&
+             validStringLength('lastName', 1, 100) &&
+             validStringLength('whatsapp', 5, 20) &&
+             request.resource.data.createdAt is timestamp;
+    }
+
     match /contributions/{contributionId} {
       // Admin can read all contributions
       allow read: if isAdmin();
-      
+
       // Anyone can create a contribution (guest checkout)
       allow create: if isValidContribution();
-      
+
       // Only admin can delete contributions (e.g. clearing test data)
       allow update: if false;
       allow delete: if isAdmin();
+    }
+
+    match /settings/{document} {
+      allow read, write: if isAdmin();
+    }
+
+    match /events/{eventId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /rsvps/{rsvpId} {
+      allow read: if isAdmin();
+      allow create: if isValidRsvp();
+      allow update, delete: if false;
     }
   }
 }

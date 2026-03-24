@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { db, auth, loginWithGoogle, logout, handleFirestoreError, OperationType } from '../lib/firebase';
+import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, deleteDoc, doc, updateDoc, setDoc, getDoc, getDocs, where } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, auth, storage, loginWithGoogle, logout, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Gift } from '../components/GiftCard';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
-import { Link2, Plus, Trash2, LogOut, Image as ImageIcon, AlertTriangle } from 'lucide-react';
+import { Link2, Plus, Trash2, LogOut, Image as ImageIcon, AlertTriangle, Bell, Calendar, MapPin, Clock, Users, ExternalLink } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 
 export function Admin() {
@@ -26,11 +27,27 @@ export function Admin() {
     status: 'available' as 'available' | 'reserved' | 'gifted',
   });
 
-  const [activeTab, setActiveTab] = useState<'gifts' | 'payments'>('gifts');
+  const [activeTab, setActiveTab] = useState<'gifts' | 'payments' | 'events'>('gifts');
   const [giftsSubTab, setGiftsSubTab] = useState<'manage' | 'contributors'>('manage');
   const [contributions, setContributions] = useState<any[]>([]);
   const [isClearingHistory, setIsClearingHistory] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  // Events state
+  const [events, setEvents] = useState<any[]>([]);
+  const [rsvps, setRsvps] = useState<any[]>([]);
+  const [selectedEventForRsvp, setSelectedEventForRsvp] = useState<string | null>(null);
+  const [eventToDelete, setEventToDelete] = useState<string | null>(null);
+  const [isCreatingEvent, setIsCreatingEvent] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [eventImageFile, setEventImageFile] = useState<File | null>(null);
+  const [eventForm, setEventForm] = useState({
+    slug: '', title: '', headline: '', imageUrl: '', location: '', date: '', time: '',
+  });
+
+  // Webhook notification state
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [isSavingWebhook, setIsSavingWebhook] = useState(false);
 
   useEffect(() => {
     const unsubscribeAuth = auth.onAuthStateChanged((u) => {
@@ -80,6 +97,29 @@ export function Admin() {
     return () => {
       unsubscribeGifts();
       unsubscribeContributions();
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const qEvents = query(collection(db, 'events'), orderBy('createdAt', 'desc'));
+    const unsubEvents = onSnapshot(qEvents, (snap) => {
+      setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    const qRsvps = query(collection(db, 'rsvps'), orderBy('createdAt', 'desc'));
+    const unsubRsvps = onSnapshot(qRsvps, (snap) => {
+      setRsvps(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    getDoc(doc(db, 'settings', 'notifications')).then(snap => {
+      if (snap.exists()) setWebhookUrl(snap.data()?.webhookUrl ?? '');
+    });
+
+    return () => {
+      unsubEvents();
+      unsubRsvps();
     };
   }, [user]);
 
@@ -214,6 +254,80 @@ export function Admin() {
     }
   };
 
+  const slugify = (text: string) =>
+    text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+  const handleEventImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) setEventImageFile(file);
+  };
+
+  const handleCreateEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setIsCreatingEvent(true);
+    try {
+      let imageUrl = eventForm.imageUrl;
+      if (eventImageFile) {
+        setIsUploadingImage(true);
+        const storageRef = ref(storage, `events/${eventForm.slug}-${Date.now()}`);
+        await uploadBytes(storageRef, eventImageFile);
+        imageUrl = await getDownloadURL(storageRef);
+        setIsUploadingImage(false);
+      }
+      // Check slug uniqueness
+      const existing = await getDocs(query(collection(db, 'events'), where('slug', '==', eventForm.slug)));
+      if (!existing.empty) {
+        toast.error('Já existe um evento com este slug. Escolha outro.');
+        return;
+      }
+      await addDoc(collection(db, 'events'), {
+        slug: eventForm.slug,
+        title: eventForm.title,
+        headline: eventForm.headline,
+        imageUrl,
+        location: eventForm.location,
+        date: eventForm.date,
+        time: eventForm.time,
+        createdAt: serverTimestamp(),
+        authorUid: user.uid,
+      });
+      toast.success('Evento criado!');
+      setEventForm({ slug: '', title: '', headline: '', imageUrl: '', location: '', date: '', time: '' });
+      setEventImageFile(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'events');
+    } finally {
+      setIsCreatingEvent(false);
+      setIsUploadingImage(false);
+    }
+  };
+
+  const confirmDeleteEvent = async () => {
+    if (!eventToDelete) return;
+    try {
+      await deleteDoc(doc(db, 'events', eventToDelete));
+      toast.success('Evento removido.');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `events/${eventToDelete}`);
+    } finally {
+      setEventToDelete(null);
+    }
+  };
+
+  const handleSaveWebhookUrl = async () => {
+    setIsSavingWebhook(true);
+    try {
+      await setDoc(doc(db, 'settings', 'notifications'), { webhookUrl });
+      toast.success('URL de notificação salva!');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'settings/notifications');
+    } finally {
+      setIsSavingWebhook(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--color-nude)]">
@@ -282,9 +396,200 @@ export function Admin() {
               <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--color-ink)]" />
             )}
           </button>
+          <button
+            onClick={() => setActiveTab('events')}
+            className={`pb-4 px-2 font-medium text-sm transition-colors relative ${
+              activeTab === 'events' ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-light)] hover:text-[var(--color-ink)]'
+            }`}
+          >
+            Eventos
+            {events.length > 0 && (
+              <span className="ml-1.5 px-1.5 py-0.5 bg-[var(--color-sage)] text-white text-xs rounded-full">{events.length}</span>
+            )}
+            {activeTab === 'events' && (
+              <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--color-ink)]" />
+            )}
+          </button>
         </div>
 
-        {activeTab === 'gifts' ? (
+        {activeTab === 'events' ? (
+          <div className="grid lg:grid-cols-[400px_1fr] gap-12">
+            {/* Create Event Form */}
+            <section className="bg-white p-8 rounded-3xl shadow-sm border border-[var(--color-nude-dark)] self-start">
+              <h2 className="font-serif text-2xl text-[var(--color-ink)] mb-6">Criar Novo Evento</h2>
+              <form onSubmit={handleCreateEvent} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-ink)] mb-1">Título *</label>
+                  <input
+                    required
+                    value={eventForm.title}
+                    onChange={e => {
+                      const title = e.target.value;
+                      setEventForm(f => ({ ...f, title, slug: slugify(title) }));
+                    }}
+                    placeholder="Ex: Chá de Cozinha"
+                    className="w-full px-4 py-3 rounded-xl border border-[var(--color-nude-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] bg-gray-50/50 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-ink)] mb-1">Slug (URL) *</label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-[var(--color-ink-light)] shrink-0">…/</span>
+                    <input
+                      required
+                      value={eventForm.slug}
+                      onChange={e => setEventForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
+                      placeholder="cha-de-cozinha"
+                      className="flex-1 px-4 py-3 rounded-xl border border-[var(--color-nude-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] bg-gray-50/50 text-sm font-mono"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-ink)] mb-1">Subtítulo / Descrição curta *</label>
+                  <input
+                    required
+                    value={eventForm.headline}
+                    onChange={e => setEventForm(f => ({ ...f, headline: e.target.value }))}
+                    placeholder="Uma tarde especial para celebrar com amor…"
+                    className="w-full px-4 py-3 rounded-xl border border-[var(--color-nude-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] bg-gray-50/50 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-ink)] mb-1">Foto do Evento</label>
+                  <label className="flex items-center gap-3 px-4 py-3 rounded-xl border border-dashed border-[var(--color-nude-dark)] cursor-pointer hover:border-[var(--color-sage)] transition-colors bg-gray-50/50">
+                    <ImageIcon className="w-5 h-5 text-[var(--color-ink-light)]" />
+                    <span className="text-sm text-[var(--color-ink-light)]">
+                      {eventImageFile ? eventImageFile.name : 'Escolher imagem…'}
+                    </span>
+                    <input type="file" accept="image/*" className="sr-only" onChange={handleEventImageChange} />
+                  </label>
+                  {isUploadingImage && <p className="text-xs text-[var(--color-sage-dark)] mt-1">Enviando imagem…</p>}
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--color-ink)] mb-1">Data *</label>
+                    <input
+                      required
+                      type="date"
+                      value={eventForm.date}
+                      onChange={e => setEventForm(f => ({ ...f, date: e.target.value }))}
+                      className="w-full px-4 py-3 rounded-xl border border-[var(--color-nude-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] bg-gray-50/50 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--color-ink)] mb-1">Horário *</label>
+                    <input
+                      required
+                      type="time"
+                      value={eventForm.time}
+                      onChange={e => setEventForm(f => ({ ...f, time: e.target.value }))}
+                      className="w-full px-4 py-3 rounded-xl border border-[var(--color-nude-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] bg-gray-50/50 text-sm"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-ink)] mb-1">Local *</label>
+                  <input
+                    required
+                    value={eventForm.location}
+                    onChange={e => setEventForm(f => ({ ...f, location: e.target.value }))}
+                    placeholder="Rua das Flores, 123 – São Paulo"
+                    className="w-full px-4 py-3 rounded-xl border border-[var(--color-nude-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] bg-gray-50/50 text-sm"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isCreatingEvent}
+                  className="w-full py-4 bg-[var(--color-ink)] text-white rounded-xl font-medium hover:bg-black transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Plus className="w-5 h-5" />
+                  {isCreatingEvent ? 'Criando…' : 'Criar Evento'}
+                </button>
+              </form>
+            </section>
+
+            {/* Event List */}
+            <div className="space-y-4">
+              <h2 className="font-serif text-2xl text-[var(--color-ink)]">Eventos Criados ({events.length})</h2>
+              {events.length === 0 ? (
+                <div className="text-center py-16 text-[var(--color-ink-light)] border-2 border-dashed border-[var(--color-nude-dark)] rounded-2xl">
+                  Nenhum evento criado ainda.
+                </div>
+              ) : (
+                events.map(ev => {
+                  const evRsvps = rsvps.filter(r => r.eventId === ev.id);
+                  return (
+                    <div key={ev.id} className="bg-white rounded-2xl shadow-sm border border-[var(--color-nude-dark)] overflow-hidden">
+                      <div className="flex gap-4 p-4">
+                        {ev.imageUrl && (
+                          <div className="w-20 h-20 rounded-xl overflow-hidden bg-gray-50 shrink-0">
+                            <img src={ev.imageUrl} alt={ev.title} className="w-full h-full object-cover" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <h3 className="font-medium text-[var(--color-ink)] truncate">{ev.title}</h3>
+                              <p className="text-xs text-[var(--color-ink-light)] mt-0.5">/{ev.slug}</p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <a
+                                href={`/${ev.slug}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="p-1.5 text-[var(--color-ink-light)] hover:text-[var(--color-sage-dark)] hover:bg-gray-50 rounded-md transition-colors"
+                                title="Ver página"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </a>
+                              <button
+                                onClick={() => setEventToDelete(ev.id)}
+                                className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                title="Remover"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-3 mt-2 text-xs text-[var(--color-ink-light)]">
+                            <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{ev.date}</span>
+                            <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{ev.time}h</span>
+                            <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{ev.location}</span>
+                          </div>
+                        </div>
+                      </div>
+                      {/* RSVP section */}
+                      <div className="border-t border-[var(--color-nude-dark)] px-4 py-3">
+                        <button
+                          onClick={() => setSelectedEventForRsvp(selectedEventForRsvp === ev.id ? null : ev.id)}
+                          className="flex items-center gap-2 text-sm font-medium text-[var(--color-sage-dark)] hover:text-[var(--color-ink)] transition-colors"
+                        >
+                          <Users className="w-4 h-4" />
+                          {evRsvps.length} confirmação(ões) de presença
+                          <span className="text-xs text-[var(--color-ink-light)]">{selectedEventForRsvp === ev.id ? '▲' : '▼'}</span>
+                        </button>
+                        {selectedEventForRsvp === ev.id && (
+                          <div className="mt-3 space-y-2">
+                            {evRsvps.length === 0 ? (
+                              <p className="text-xs text-[var(--color-ink-light)] py-2">Nenhuma confirmação ainda.</p>
+                            ) : (
+                              evRsvps.map(r => (
+                                <div key={r.id} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0">
+                                  <span className="font-medium text-[var(--color-ink)]">{r.firstName} {r.lastName}</span>
+                                  <span className="text-[var(--color-ink-light)]">{r.whatsapp}</span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        ) : activeTab === 'gifts' ? (
           <div>
             {/* Sub-tabs */}
             <div className="flex gap-6 mb-8 border-b border-[var(--color-nude-dark)]">
@@ -616,6 +921,33 @@ export function Admin() {
             </div>
           </div>
 
+          {/* Webhook Notification Config */}
+          <div className="bg-white rounded-3xl p-8 shadow-sm border border-[var(--color-nude-dark)]">
+            <div className="flex items-center gap-3 mb-4">
+              <Bell className="w-5 h-5 text-[var(--color-sage-dark)]" />
+              <h3 className="font-serif text-xl text-[var(--color-ink)]">Notificação de Pagamento Aprovado</h3>
+            </div>
+            <p className="text-sm text-[var(--color-ink-light)] mb-4">
+              Quando um pagamento for aprovado, o sistema enviará um POST com os dados para a URL abaixo.
+            </p>
+            <div className="flex gap-3">
+              <input
+                type="url"
+                value={webhookUrl}
+                onChange={e => setWebhookUrl(e.target.value)}
+                placeholder="https://..."
+                className="flex-1 px-4 py-3 rounded-xl border border-[var(--color-nude-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] bg-gray-50/50 text-sm"
+              />
+              <button
+                onClick={handleSaveWebhookUrl}
+                disabled={isSavingWebhook}
+                className="px-6 py-3 bg-[var(--color-ink)] text-white rounded-xl font-medium hover:bg-black transition-colors disabled:opacity-50 whitespace-nowrap text-sm"
+              >
+                {isSavingWebhook ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+
           <div className="bg-white rounded-3xl shadow-sm border border-[var(--color-nude-dark)] overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
@@ -705,6 +1037,30 @@ export function Admin() {
                 className="px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors disabled:opacity-50"
               >
                 {isClearingHistory ? 'Apagando...' : 'Apagar tudo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Event Confirmation Modal */}
+      {eventToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <h3 className="text-xl font-serif text-[var(--color-ink)] mb-2">Remover Evento</h3>
+            <p className="text-[var(--color-ink-light)] mb-6">Tem certeza que deseja remover este evento? As confirmações de presença não serão apagadas automaticamente.</p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setEventToDelete(null)}
+                className="px-4 py-2 text-[var(--color-ink)] hover:bg-gray-100 rounded-lg font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDeleteEvent}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors"
+              >
+                Remover
               </button>
             </div>
           </div>
