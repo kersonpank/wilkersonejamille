@@ -437,18 +437,34 @@ export function Admin() {
           </div>
         ) : (
           <div className="space-y-8">
-            <div className="grid sm:grid-cols-3 gap-6">
+            {/* Environment indicator */}
+            {import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY?.startsWith('TEST-') && (
+              <div className="mb-6 flex items-center gap-2 bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-xl text-sm font-medium">
+                <span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" />
+                Modo Sandbox (Teste) — pagamentos não são reais
+              </div>
+            )}
+
+            <div className="grid sm:grid-cols-4 gap-6">
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-[var(--color-nude-dark)]">
-                <p className="text-sm text-[var(--color-ink-light)] mb-2">Total Arrecadado (Aprovado)</p>
-                <p className="font-serif text-3xl text-[var(--color-sage-dark)]">
+                <p className="text-sm text-[var(--color-ink-light)] mb-2">Total Cobrado (Aprovado)</p>
+                <p className="font-serif text-2xl text-[var(--color-sage-dark)]">
                   {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
                     contributions.filter(c => c.status === 'approved').reduce((acc, curr) => acc + curr.amount, 0)
                   )}
                 </p>
               </div>
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-[var(--color-nude-dark)]">
+                <p className="text-sm text-[var(--color-ink-light)] mb-2">Recebido Líquido (após taxas)</p>
+                <p className="font-serif text-2xl text-green-700">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                    contributions.filter(c => c.status === 'approved' && c.netAmount != null).reduce((acc, curr) => acc + curr.netAmount, 0)
+                  )}
+                </p>
+              </div>
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-[var(--color-nude-dark)]">
                 <p className="text-sm text-[var(--color-ink-light)] mb-2">Total Pendente</p>
-                <p className="font-serif text-3xl text-yellow-600">
+                <p className="font-serif text-2xl text-yellow-600">
                   {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
                     contributions.filter(c => c.status === 'pending' || c.status === 'in_process').reduce((acc, curr) => acc + curr.amount, 0)
                   )}
@@ -503,7 +519,8 @@ export function Admin() {
                     <tr className="bg-gray-50 border-b border-[var(--color-nude-dark)]">
                       <th className="p-4 text-sm font-medium text-[var(--color-ink-light)]">Convidado</th>
                       <th className="p-4 text-sm font-medium text-[var(--color-ink-light)]">Mensagem</th>
-                      <th className="p-4 text-sm font-medium text-[var(--color-ink-light)]">Valor</th>
+                      <th className="p-4 text-sm font-medium text-[var(--color-ink-light)]">Cobrado</th>
+                      <th className="p-4 text-sm font-medium text-[var(--color-ink-light)]">Líquido</th>
                       <th className="p-4 text-sm font-medium text-[var(--color-ink-light)]">Método</th>
                       <th className="p-4 text-sm font-medium text-[var(--color-ink-light)]">Status</th>
                       <th className="p-4 text-sm font-medium text-[var(--color-ink-light)]">Data</th>
@@ -516,6 +533,11 @@ export function Admin() {
                         <td className="p-4 text-sm text-[var(--color-ink-light)] max-w-xs truncate" title={c.message}>{c.message || '-'}</td>
                         <td className="p-4 text-sm font-medium text-[var(--color-sage-dark)]">
                           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(c.amount)}
+                        </td>
+                        <td className="p-4 text-sm font-medium text-green-700">
+                          {c.netAmount != null
+                            ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(c.netAmount)
+                            : <span className="text-gray-400">—</span>}
                         </td>
                         <td className="p-4 text-sm text-[var(--color-ink-light)] capitalize">{c.paymentMethod?.replace('_', ' ')}</td>
                         <td className="p-4 text-sm">
@@ -541,7 +563,7 @@ export function Admin() {
                     ))}
                     {contributions.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="p-8 text-center text-[var(--color-ink-light)]">
+                        <td colSpan={7} className="p-8 text-center text-[var(--color-ink-light)]">
                           Nenhuma contribuição recebida ainda.
                         </td>
                       </tr>

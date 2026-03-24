@@ -50,7 +50,8 @@ async function startServer() {
       res.status(201).json({
         status: response.status,
         status_detail: response.status_detail,
-        id: response.id
+        id: response.id,
+        net_received_amount: response.transaction_details?.net_received_amount ?? null,
       });
     } catch (error: any) {
       console.error("Payment error:", JSON.stringify(error?.cause || error?.message || error, null, 2));
@@ -70,22 +71,38 @@ async function startServer() {
       // We only care about payment updates
       if (action === "payment.created" || action === "payment.updated") {
         const paymentId = data.id;
-        
+
         // Fetch the latest payment status from Mercado Pago
         const payment = new Payment(client);
         const paymentData = await payment.get({ id: paymentId });
-        
+
         const newStatus = paymentData.status;
-        
+        const netAmount = paymentData.transaction_details?.net_received_amount ?? null;
+
         // Find the contribution in Firestore with this paymentId
         const contributionsRef = db.collection('contributions');
         const snapshot = await contributionsRef.where('paymentId', '==', String(paymentId)).get();
-        
+
         if (!snapshot.empty) {
           const batch = db.batch();
+
+          // Update contribution status and net amount
           snapshot.docs.forEach(doc => {
-            batch.update(doc.ref, { status: newStatus });
+            const update: Record<string, any> = { status: newStatus };
+            if (netAmount !== null) update.netAmount = netAmount;
+            batch.update(doc.ref, update);
           });
+
+          // When approved, mark each gift as 'gifted'
+          if (newStatus === 'approved') {
+            const giftIds = [...new Set(snapshot.docs.map(doc => doc.data().giftId as string))];
+            for (const giftId of giftIds) {
+              const giftRef = db.collection('gifts').doc(giftId);
+              batch.update(giftRef, { status: 'gifted' });
+            }
+            console.log(`Marked gifts as gifted: ${giftIds.join(', ')}`);
+          }
+
           await batch.commit();
           console.log(`Updated payment ${paymentId} to status ${newStatus}`);
         } else {

@@ -11,7 +11,7 @@ interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
   cartItems: Gift[];
-  onSubmit: (data: { name: string; message: string; method: string; paymentId: string; status: string }) => void;
+  onSubmit: (data: { name: string; message: string; method: string; paymentId: string; status: string; netAmount?: number | null }) => void;
 }
 
 export function CheckoutModal({ isOpen, onClose, cartItems, onSubmit }: CheckoutModalProps) {
@@ -35,12 +35,13 @@ export function CheckoutModal({ isOpen, onClose, cartItems, onSubmit }: Checkout
           if (response.error) {
             reject();
           } else {
-            onSubmit({ 
-              name, 
-              message, 
+            onSubmit({
+              name,
+              message,
               method: param.formData.payment_method_id,
               paymentId: String(response.id),
-              status: response.status
+              status: response.status,
+              netAmount: response.net_received_amount ?? null,
             });
             resolve();
           }

@@ -49,10 +49,10 @@ export function Gifts() {
     setCart(cart.filter((item) => item.id !== id));
   };
 
-  const handleCheckoutSubmit = async (data: { name: string; message: string; method: string; paymentId: string; status: string }) => {
+  const handleCheckoutSubmit = async (data: { name: string; message: string; method: string; paymentId: string; status: string; netAmount?: number | null }) => {
     try {
       for (const item of cart) {
-        await addDoc(collection(db, 'contributions'), {
+        const contribution: Record<string, any> = {
           giftId: item.id,
           guestName: data.name,
           message: data.message,
@@ -61,7 +61,9 @@ export function Gifts() {
           paymentId: data.paymentId,
           status: data.status,
           createdAt: serverTimestamp(),
-        });
+        };
+        if (data.netAmount != null) contribution.netAmount = data.netAmount;
+        await addDoc(collection(db, 'contributions'), contribution);
       }
 
       toast.success('Obrigado pelo presente! Sua contribuição foi registrada com sucesso.', {
