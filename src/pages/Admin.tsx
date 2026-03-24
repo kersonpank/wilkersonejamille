@@ -4,7 +4,7 @@ import { db, auth, loginWithGoogle, logout, handleFirestoreError, OperationType 
 import { Gift } from '../components/GiftCard';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
-import { Link2, Plus, Trash2, LogOut, Image as ImageIcon } from 'lucide-react';
+import { Link2, Plus, Trash2, LogOut, Image as ImageIcon, AlertTriangle } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 
 export function Admin() {
@@ -28,6 +28,8 @@ export function Admin() {
 
   const [activeTab, setActiveTab] = useState<'gifts' | 'payments'>('gifts');
   const [contributions, setContributions] = useState<any[]>([]);
+  const [isClearingHistory, setIsClearingHistory] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   useEffect(() => {
     const unsubscribeAuth = auth.onAuthStateChanged((u) => {
@@ -193,6 +195,21 @@ export function Admin() {
       toast.success('Status atualizado.');
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `gifts/${id}`);
+    }
+  };
+
+  const handleClearHistory = async () => {
+    setIsClearingHistory(true);
+    try {
+      for (const c of contributions) {
+        await deleteDoc(doc(db, 'contributions', c.id));
+      }
+      toast.success(`${contributions.length} registro(s) apagado(s).`);
+      setShowClearConfirm(false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, 'contributions');
+    } finally {
+      setIsClearingHistory(false);
     }
   };
 
@@ -437,13 +454,29 @@ export function Admin() {
           </div>
         ) : (
           <div className="space-y-8">
-            {/* Environment indicator */}
-            {import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY?.startsWith('TEST-') && (
-              <div className="mb-6 flex items-center gap-2 bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-xl text-sm font-medium">
-                <span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" />
-                Modo Sandbox (Teste) — pagamentos não são reais
-              </div>
-            )}
+            {/* Environment indicator + clear button */}
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              {import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY?.startsWith('TEST-') ? (
+                <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-xl text-sm font-medium">
+                  <span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" />
+                  Modo Sandbox (Teste) — pagamentos não são reais
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-xl text-sm font-medium">
+                  <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                  Modo Produção — pagamentos reais
+                </div>
+              )}
+              {contributions.length > 0 && (
+                <button
+                  onClick={() => setShowClearConfirm(true)}
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-red-500 border border-red-200 rounded-xl hover:bg-red-50 transition-colors"
+                >
+                  <AlertTriangle className="w-4 h-4" />
+                  Limpar histórico
+                </button>
+              )}
+            </div>
 
             <div className="grid sm:grid-cols-4 gap-6">
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-[var(--color-nude-dark)]">
@@ -575,6 +608,37 @@ export function Admin() {
           </div>
         )}
       </main>
+
+      {/* Clear History Confirmation Modal */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <div className="flex items-center gap-3 mb-3">
+              <AlertTriangle className="w-6 h-6 text-red-500 shrink-0" />
+              <h3 className="text-xl font-serif text-[var(--color-ink)]">Limpar Histórico</h3>
+            </div>
+            <p className="text-[var(--color-ink-light)] mb-6">
+              Todos os <strong>{contributions.length} registro(s)</strong> de pagamento serão apagados permanentemente. Use apenas para limpar dados de teste.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                disabled={isClearingHistory}
+                className="px-4 py-2 text-[var(--color-ink)] hover:bg-gray-100 rounded-lg font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleClearHistory}
+                disabled={isClearingHistory}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors disabled:opacity-50"
+              >
+                {isClearingHistory ? 'Apagando...' : 'Apagar tudo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {giftToDelete && (

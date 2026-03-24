@@ -139,8 +139,9 @@ service cloud.firestore {
       // Anyone can create a contribution (guest checkout)
       allow create: if isValidContribution();
       
-      // Contributions cannot be updated or deleted from client
-      allow update, delete: if false;
+      // Only admin can delete contributions (e.g. clearing test data)
+      allow update: if false;
+      allow delete: if isAdmin();
     }
   }
 }
