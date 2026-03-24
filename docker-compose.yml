@@ -1,0 +1,54 @@
+version: "3.8"
+
+services:
+  listasonhos:
+    image: listasonhos-wej:latest
+    # Para build local, descomente a linha abaixo e comente "image":
+    # build:
+    #   context: .
+    #   args:
+    #     GEMINI_API_KEY: ${GEMINI_API_KEY}
+    #     VITE_MERCADOPAGO_PUBLIC_KEY: ${VITE_MERCADOPAGO_PUBLIC_KEY}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      APP_URL: ${APP_URL}
+      MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN}
+      FIREBASE_SERVICE_ACCOUNT: ${FIREBASE_SERVICE_ACCOUNT}
+    networks:
+      - traefik-public
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      restart_policy:
+        condition: on-failure
+    labels:
+      # Ativa o Traefik para este serviço
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+
+      # Router HTTP → redireciona para HTTPS
+      - "traefik.http.routers.listasonhos-http.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.listasonhos-http.entrypoints=web"
+      - "traefik.http.routers.listasonhos-http.middlewares=redirect-to-https"
+
+      # Router HTTPS com SSL automático (Let's Encrypt)
+      - "traefik.http.routers.listasonhos.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.listasonhos.entrypoints=websecure"
+      - "traefik.http.routers.listasonhos.tls=true"
+      - "traefik.http.routers.listasonhos.tls.certresolver=letsencrypt"
+
+      # Serviço interno na porta 3000
+      - "traefik.http.services.listasonhos.loadbalancer.server.port=3000"
+
+      # Middleware de redirecionamento HTTP→HTTPS (definido uma vez, reutilizável)
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
+
+networks:
+  traefik-public:
+    external: true

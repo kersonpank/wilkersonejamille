@@ -1,0 +1,94 @@
+{
+  "entities": {
+    "Gift": {
+      "title": "Gift",
+      "description": "A gift item on the registry",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "The name of the gift"
+        },
+        "description": {
+          "type": "string",
+          "description": "A short description of the gift"
+        },
+        "price": {
+          "type": "number",
+          "description": "The price of the gift in BRL"
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "URL to the image of the gift"
+        },
+        "originalLink": {
+          "type": "string",
+          "description": "The original marketplace link"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["available", "reserved", "gifted"],
+          "description": "The current status of the gift"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the gift was added"
+        },
+        "authorUid": {
+          "type": "string",
+          "description": "The UID of the admin who added the gift"
+        }
+      },
+      "required": ["title", "price", "imageUrl", "status", "createdAt", "authorUid"]
+    },
+    "Contribution": {
+      "title": "Contribution",
+      "description": "A guest's contribution or purchase of a gift",
+      "type": "object",
+      "properties": {
+        "giftId": {
+          "type": "string",
+          "description": "The ID of the gift"
+        },
+        "guestName": {
+          "type": "string",
+          "description": "The name of the guest"
+        },
+        "message": {
+          "type": "string",
+          "description": "A message from the guest to the couple"
+        },
+        "amount": {
+          "type": "number",
+          "description": "The amount contributed"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["pix", "credit_card"],
+          "description": "The payment method chosen"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the contribution was made"
+        }
+      },
+      "required": ["giftId", "guestName", "amount", "paymentMethod", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/gifts/{giftId}": {
+      "schema": {
+        "$ref": "#/entities/Gift"
+      },
+      "description": "The collection of gifts"
+    },
+    "/contributions/{contributionId}": {
+      "schema": {
+        "$ref": "#/entities/Contribution"
+      },
+      "description": "The collection of guest contributions"
+    }
+  }
+}

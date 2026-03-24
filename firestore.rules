@@ -1,0 +1,144 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: gifts
+    // Document ID: auto-generated
+    // Fields:
+    //   - title: string (required, max 200 chars)
+    //   - description: string (optional, max 1000 chars)
+    //   - price: number (required, > 0)
+    //   - imageUrl: string (required, valid URL, max 1000 chars)
+    //   - originalLink: string (optional, valid URL, max 1000 chars)
+    //   - status: string (required, 'available', 'reserved', 'gifted')
+    //   - createdAt: timestamp (required, immutable)
+    //   - authorUid: string (required, immutable)
+    //
+    // Collection: contributions
+    // Document ID: auto-generated
+    // Fields:
+    //   - giftId: string (required, max 100 chars)
+    //   - guestName: string (required, max 100 chars)
+    //   - message: string (optional, max 1000 chars)
+    //   - amount: number (required, > 0)
+    //   - paymentMethod: string (required, 'pix', 'credit_card')
+    //   - createdAt: timestamp (required, immutable)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.email == "wilkersonmes@gmail.com" && request.auth.token.email_verified == true;
+    }
+
+    function isOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.authorUid;
+    }
+
+    function uidUnchanged() {
+      return !('authorUid' in request.resource.data) || request.resource.data.authorUid == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('authorUid' in request.resource.data) || request.resource.data.authorUid == resource.data.authorUid;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is string &&
+              request.resource.data[field].size() >= minLen &&
+              request.resource.data[field].size() <= maxLen);
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    function isPositive(field) {
+      return request.resource.data[field] is number && request.resource.data[field] > 0;
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidGift() {
+      return hasRequiredFields(['title', 'price', 'imageUrl', 'status', 'createdAt', 'authorUid']) &&
+             validStringLength('title', 1, 200) &&
+             isValidOptionalString('description', 0, 1000) &&
+             isPositive('price') &&
+             isValidUrl(request.resource.data.imageUrl) &&
+             request.resource.data.imageUrl.size() <= 1000 &&
+             (!( 'originalLink' in request.resource.data ) || (isValidUrl(request.resource.data.originalLink) && request.resource.data.originalLink.size() <= 1000)) &&
+             request.resource.data.status in ['available', 'reserved', 'gifted'] &&
+             request.resource.data.createdAt is timestamp &&
+             request.resource.data.authorUid is string;
+    }
+
+    function isValidContribution() {
+      return hasRequiredFields(['giftId', 'guestName', 'amount', 'paymentMethod', 'createdAt', 'paymentId', 'status']) &&
+             validStringLength('giftId', 1, 100) &&
+             validStringLength('guestName', 1, 100) &&
+             isValidOptionalString('message', 0, 1000) &&
+             isPositive('amount') &&
+             request.resource.data.paymentMethod is string &&
+             request.resource.data.paymentId is string &&
+             request.resource.data.status is string &&
+             request.resource.data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /gifts/{giftId} {
+      // Anyone can read gifts
+      allow read: if true;
+      
+      // Only admin can create gifts
+      allow create: if isAdmin() && isValidGift() && uidUnchanged();
+      
+      // Only admin can update gifts, protecting immutable fields
+      allow update: if isAdmin() && isValidGift() && uidNotModified() && areImmutableFieldsUnchanged(['createdAt']);
+      
+      // Only admin can delete gifts
+      allow delete: if isAdmin();
+    }
+
+    match /contributions/{contributionId} {
+      // Admin can read all contributions
+      allow read: if isAdmin();
+      
+      // Anyone can create a contribution (guest checkout)
+      allow create: if isValidContribution();
+      
+      // Contributions cannot be updated or deleted from client
+      allow update, delete: if false;
+    }
+  }
+}

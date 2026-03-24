@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const fs=require\\(''fs''\\); const raw=fs.readFileSync\\(''d:/Kerson Company Tech/site W e J Lista/ListSonhos WeJ/sa-temp.json'',''utf8''\\).trim\\(\\); const b64=Buffer.from\\(raw\\).toString\\(''base64''\\); console.log\\(b64\\);\")",
+      "Bash(node -e \"const fs=require\\(''fs''\\); const raw=fs.readFileSync\\(''d:/Kerson Company Tech/site W e J Lista/ListSonhos WeJ/sa-temp.json'',''utf8''\\).trim\\(\\); console.log\\(Buffer.from\\(raw\\).toString\\(''base64''\\)\\);\")"
+    ]
+  }
+}
