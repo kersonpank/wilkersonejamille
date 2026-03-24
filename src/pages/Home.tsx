@@ -86,7 +86,7 @@ export function Home() {
       <footer className="py-12 bg-white text-center border-t border-[var(--color-nude-dark)] mt-auto">
         <p className="font-serif text-2xl text-[var(--color-ink)] mb-4">W & J</p>
         <p className="text-sm text-[var(--color-ink-light)]">
-          Com amor, Wilkerson & Jamille.
+          Com amor, Wilkerson Mesquita & Jamille Mesquita.
         </p>
       </footer>
     </div>
