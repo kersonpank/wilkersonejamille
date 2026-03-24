@@ -468,7 +468,7 @@ export function Admin() {
               <div>
                 <h4 className="font-medium text-[var(--color-ink)] mb-2">1. Credenciais de Produção</h4>
                 <p className="text-sm text-[var(--color-ink-light)] mb-2">
-                  Para receber pagamentos reais, você precisa configurar as variáveis de ambiente no painel do AI Studio (Settings &gt; Secrets):
+                  Para receber pagamentos reais, você precisa configurar as variáveis de ambiente no painel do Railway (seu serviço &gt; Variables):
                 </p>
                 <ul className="list-disc list-inside text-sm text-gray-700 space-y-1 ml-2">
                   <li><strong>VITE_MERCADOPAGO_PUBLIC_KEY</strong>: Sua Public Key de produção</li>
@@ -525,7 +525,13 @@ export function Admin() {
                             c.status === 'rejected' || c.status === 'cancelled' ? 'bg-red-100 text-red-700' :
                             'bg-gray-100 text-gray-700'
                           }`}>
-                            {c.status || 'Desconhecido'}
+                            {{
+                              approved: 'Aprovado',
+                              pending: 'Pendente',
+                              in_process: 'Em processamento',
+                              rejected: 'Rejeitado',
+                              cancelled: 'Cancelado',
+                            }[c.status as string] || c.status || 'Desconhecido'}
                           </span>
                         </td>
                         <td className="p-4 text-sm text-[var(--color-ink-light)]">

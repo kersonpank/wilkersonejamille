@@ -52,9 +52,14 @@ async function startServer() {
         status_detail: response.status_detail,
         id: response.id
       });
-    } catch (error) {
-      console.error("Payment error:", error);
-      res.status(500).json({ error: "Failed to process payment" });
+    } catch (error: any) {
+      console.error("Payment error:", JSON.stringify(error?.cause || error?.message || error, null, 2));
+      const causes = error?.cause;
+      const detail = Array.isArray(causes) ? causes : causes ? [causes] : [];
+      res.status(500).json({
+        error: "Falha ao processar pagamento",
+        detail: detail.length > 0 ? detail : (error?.message || 'Erro desconhecido'),
+      });
     }
   });
 

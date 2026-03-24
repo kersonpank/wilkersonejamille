@@ -43,9 +43,9 @@ export function CartSidebar({ isOpen, onClose, cartItems, onRemove, onCheckout }
               {cartItems.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center space-y-4 text-[var(--color-ink-light)]">
                   <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm">
-                    <span className="text-2xl">ð</span>
+                    <span className="text-2xl">🎁</span>
                   </div>
-                  <p>Seu carrinho estÃ¡ vazio.</p>
+                  <p>Seu carrinho está vazio.</p>
                 </div>
               ) : (
                 cartItems.map((item) => (
@@ -84,7 +84,7 @@ export function CartSidebar({ isOpen, onClose, cartItems, onRemove, onCheckout }
                   onClick={onCheckout}
                   className="w-full py-4 bg-[var(--color-ink)] text-white rounded-full font-medium tracking-wide hover:bg-black transition-colors"
                 >
-                  AvanÃ§ar para Checkout
+                  Avançar para Checkout
                 </button>
               </div>
             )}
