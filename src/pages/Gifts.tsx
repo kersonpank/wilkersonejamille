@@ -71,8 +71,6 @@ export function Gifts() {
       });
 
       setCart([]);
-      setIsCheckoutOpen(false);
-      setIsCartOpen(false);
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'contributions');
     }
@@ -154,7 +152,7 @@ export function Gifts() {
 
       <CheckoutModal
         isOpen={isCheckoutOpen}
-        onClose={() => setIsCheckoutOpen(false)}
+        onClose={() => { setIsCheckoutOpen(false); setIsCartOpen(false); }}
         cartItems={cart}
         onSubmit={handleCheckoutSubmit}
       />
