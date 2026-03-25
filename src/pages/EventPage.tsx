@@ -193,6 +193,15 @@ export function EventPage() {
               <CheckCircle className="w-12 h-12 text-[var(--color-sage-dark)]" />
               <p className="font-serif text-2xl text-[var(--color-ink)]">Presença confirmada!</p>
               <p className="text-[var(--color-ink-light)]">Mal podemos esperar para te ver por lá.</p>
+              <div className="w-full border-t border-[var(--color-nude-dark)] pt-4 mt-2 text-center">
+                <p className="text-sm text-[var(--color-ink-light)] mb-3">Que tal já escolher um presente para o casal?</p>
+                <Link
+                  to="/presentes"
+                  className="inline-block px-6 py-3 bg-[var(--color-sage-dark)] text-white rounded-full font-medium hover:opacity-90 transition-opacity text-sm"
+                >
+                  Ver Lista de Presentes
+                </Link>
+              </div>
             </div>
           ) : (
             <>
