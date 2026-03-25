@@ -6,7 +6,6 @@ import { Gift } from '../components/GiftCard';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { Link2, Plus, Trash2, LogOut, Image as ImageIcon, AlertTriangle, Bell, Calendar, MapPin, Clock, Users, ExternalLink, Pencil, X } from 'lucide-react';
-import { GoogleGenAI, Type } from '@google/genai';
 
 export function Admin() {
   const [user, setUser] = useState(auth.currentUser);
@@ -126,55 +125,26 @@ export function Admin() {
 
   const handleExtractData = async () => {
     if (!linkInput.trim()) return;
-    
+
     setIsExtracting(true);
     try {
-      // Fetch image from our backend proxy
-      const extractImagePromise = fetch('/api/extract', {
+      const res = await fetch('/api/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: linkInput })
-      }).then(res => res.json()).catch(() => ({ imageUrl: '' }));
-
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      
-      const aiPromise = ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Acesse a URL e extraia as informações reais do produto: ${linkInput}. 
-        Retorne um JSON com: 
-        - title (string): Nome do produto.
-        - price (number): Preço numérico do produto.
-        - description (string): Breve descrição do produto.
-        - imageUrl (string): A URL real e absoluta da imagem do produto. Procure especificamente pela tag <meta property="og:image">, <meta name="twitter:image">, ou a imagem principal do produto no HTML. NÃO INVENTE URLs, NÃO use picsum ou placeholders. Se não encontrar a URL real da imagem, retorne uma string vazia "".`,
-        config: {
-          tools: [{ urlContext: {} }],
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING, description: "O nome do produto" },
-              price: { type: Type.NUMBER, description: "O preço do produto em BRL" },
-              description: { type: Type.STRING, description: "Uma breve descrição do produto" },
-              imageUrl: { type: Type.STRING, description: "URL da imagem do produto" },
-            },
-            required: ["title", "price", "description", "imageUrl"],
-          },
-        },
+        body: JSON.stringify({ url: linkInput }),
       });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Falha na extração');
 
-      const [imageResult, aiResponse] = await Promise.all([extractImagePromise, aiPromise]);
-
-      const data = JSON.parse(aiResponse.text || '{}');
-      
       setFormData({
         title: data.title || '',
-        price: data.price ? data.price.toString() : '',
+        price: data.price != null ? String(data.price) : '',
         description: data.description || '',
-        imageUrl: imageResult.imageUrl || data.imageUrl || '',
+        imageUrl: data.imageUrl || '',
         originalLink: linkInput,
         status: 'available',
       });
-      
+
       toast.success('Dados extraídos com sucesso! Revise antes de salvar.');
     } catch (error) {
       console.error('Erro ao extrair dados:', error);
