@@ -268,7 +268,8 @@ async function startServer() {
       const ev = snap.docs[0].data();
       const appUrl = process.env.APP_URL || `https://${req.headers.host}`;
       const pageUrl = `${appUrl}/${slug}`;
-      const imageUrl = `${appUrl}/api/og-image/${slug}`;
+      const updatedAt = snap.docs[0].updateTime?.seconds ?? snap.docs[0].createTime?.seconds ?? 0;
+      const imageUrl = `${appUrl}/api/og-image/${slug}?v=${updatedAt}`;
       const esc = (s: string) => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       // Build rich description with date, time and location
       const formatDate = (d: string) => {

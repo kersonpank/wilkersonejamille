@@ -5,7 +5,7 @@ import { db, auth, storage, loginWithGoogle, logout, handleFirestoreError, Opera
 import { Gift } from '../components/GiftCard';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
-import { Link2, Plus, Trash2, LogOut, Image as ImageIcon, AlertTriangle, Bell, Calendar, MapPin, Clock, Users, ExternalLink } from 'lucide-react';
+import { Link2, Plus, Trash2, LogOut, Image as ImageIcon, AlertTriangle, Bell, Calendar, MapPin, Clock, Users, ExternalLink, Pencil, X } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 
 export function Admin() {
@@ -41,6 +41,7 @@ export function Admin() {
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [eventImageFile, setEventImageFile] = useState<File | null>(null);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [eventForm, setEventForm] = useState({
     slug: '', title: '', headline: '', imageUrl: '', location: '', date: '', time: '',
   });
@@ -263,6 +264,19 @@ export function Admin() {
     if (file) setEventImageFile(file);
   };
 
+  const startEditEvent = (ev: any) => {
+    setEditingEventId(ev.id);
+    setEventForm({ slug: ev.slug, title: ev.title, headline: ev.headline, imageUrl: ev.imageUrl, location: ev.location, date: ev.date, time: ev.time });
+    setEventImageFile(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelEditEvent = () => {
+    setEditingEventId(null);
+    setEventForm({ slug: '', title: '', headline: '', imageUrl: '', location: '', date: '', time: '' });
+    setEventImageFile(null);
+  };
+
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -276,24 +290,39 @@ export function Admin() {
         imageUrl = await getDownloadURL(storageRef);
         setIsUploadingImage(false);
       }
-      // Check slug uniqueness
-      const existing = await getDocs(query(collection(db, 'events'), where('slug', '==', eventForm.slug)));
-      if (!existing.empty) {
-        toast.error('Já existe um evento com este slug. Escolha outro.');
-        return;
+
+      if (editingEventId) {
+        // Update existing event
+        await updateDoc(doc(db, 'events', editingEventId), {
+          title: eventForm.title,
+          headline: eventForm.headline,
+          imageUrl,
+          location: eventForm.location,
+          date: eventForm.date,
+          time: eventForm.time,
+        });
+        toast.success('Evento atualizado!');
+        setEditingEventId(null);
+      } else {
+        // Check slug uniqueness only on create
+        const existing = await getDocs(query(collection(db, 'events'), where('slug', '==', eventForm.slug)));
+        if (!existing.empty) {
+          toast.error('Já existe um evento com este slug. Escolha outro.');
+          return;
+        }
+        await addDoc(collection(db, 'events'), {
+          slug: eventForm.slug,
+          title: eventForm.title,
+          headline: eventForm.headline,
+          imageUrl,
+          location: eventForm.location,
+          date: eventForm.date,
+          time: eventForm.time,
+          createdAt: serverTimestamp(),
+          authorUid: user.uid,
+        });
+        toast.success('Evento criado!');
       }
-      await addDoc(collection(db, 'events'), {
-        slug: eventForm.slug,
-        title: eventForm.title,
-        headline: eventForm.headline,
-        imageUrl,
-        location: eventForm.location,
-        date: eventForm.date,
-        time: eventForm.time,
-        createdAt: serverTimestamp(),
-        authorUid: user.uid,
-      });
-      toast.success('Evento criado!');
       setEventForm({ slug: '', title: '', headline: '', imageUrl: '', location: '', date: '', time: '' });
       setEventImageFile(null);
     } catch (error) {
@@ -414,9 +443,18 @@ export function Admin() {
 
         {activeTab === 'events' ? (
           <div className="grid lg:grid-cols-[400px_1fr] gap-12">
-            {/* Create Event Form */}
+            {/* Create / Edit Event Form */}
             <section className="bg-white p-8 rounded-3xl shadow-sm border border-[var(--color-nude-dark)] self-start">
-              <h2 className="font-serif text-2xl text-[var(--color-ink)] mb-6">Criar Novo Evento</h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="font-serif text-2xl text-[var(--color-ink)]">
+                  {editingEventId ? 'Editar Evento' : 'Criar Novo Evento'}
+                </h2>
+                {editingEventId && (
+                  <button onClick={cancelEditEvent} className="p-1.5 text-[var(--color-ink-light)] hover:text-[var(--color-ink)] hover:bg-gray-100 rounded-lg transition-colors" title="Cancelar edição">
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
               <form onSubmit={handleCreateEvent} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-[var(--color-ink)] mb-1">Título *</label>
@@ -425,12 +463,13 @@ export function Admin() {
                     value={eventForm.title}
                     onChange={e => {
                       const title = e.target.value;
-                      setEventForm(f => ({ ...f, title, slug: slugify(title) }));
+                      setEventForm(f => ({ ...f, title, ...(editingEventId ? {} : { slug: slugify(title) }) }));
                     }}
                     placeholder="Ex: Chá de Cozinha"
                     className="w-full px-4 py-3 rounded-xl border border-[var(--color-nude-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] bg-gray-50/50 text-sm"
                   />
                 </div>
+                {!editingEventId && (
                 <div>
                   <label className="block text-sm font-medium text-[var(--color-ink)] mb-1">Slug (URL) *</label>
                   <div className="flex items-center gap-2">
@@ -444,6 +483,7 @@ export function Admin() {
                     />
                   </div>
                 </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-[var(--color-ink)] mb-1">Subtítulo / Descrição curta *</label>
                   <input
@@ -505,8 +545,8 @@ export function Admin() {
                   disabled={isCreatingEvent}
                   className="w-full py-4 bg-[var(--color-ink)] text-white rounded-xl font-medium hover:bg-black transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  <Plus className="w-5 h-5" />
-                  {isCreatingEvent ? 'Criando…' : 'Criar Evento'}
+                  {editingEventId ? <Pencil className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                  {isCreatingEvent ? (editingEventId ? 'Salvando…' : 'Criando…') : (editingEventId ? 'Salvar Alterações' : 'Criar Evento')}
                 </button>
               </form>
             </section>
@@ -535,7 +575,7 @@ export function Admin() {
                               <h3 className="font-medium text-[var(--color-ink)] truncate">{ev.title}</h3>
                               <p className="text-xs text-[var(--color-ink-light)] mt-0.5">/{ev.slug}</p>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-1 shrink-0">
                               <a
                                 href={`/${ev.slug}`}
                                 target="_blank"
@@ -545,6 +585,13 @@ export function Admin() {
                               >
                                 <ExternalLink className="w-4 h-4" />
                               </a>
+                              <button
+                                onClick={() => startEditEvent(ev)}
+                                className="p-1.5 text-[var(--color-ink-light)] hover:text-[var(--color-sage-dark)] hover:bg-gray-50 rounded-md transition-colors"
+                                title="Editar"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
                               <button
                                 onClick={() => setEventToDelete(ev.id)}
                                 className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
