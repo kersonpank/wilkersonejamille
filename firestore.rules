@@ -140,6 +140,12 @@ service cloud.firestore {
              request.resource.data.createdAt is timestamp;
     }
 
+    function isValidRsvpAdmin() {
+      return hasRequiredFields(['eventId', 'firstName', 'createdAt']) &&
+             validStringLength('firstName', 1, 100) &&
+             request.resource.data.createdAt is timestamp;
+    }
+
     match /contributions/{contributionId} {
       // Admin can read all contributions
       allow read: if isAdmin();
@@ -163,8 +169,8 @@ service cloud.firestore {
 
     match /rsvps/{rsvpId} {
       allow read: if isAdmin();
-      allow create: if isValidRsvp();
-      allow update, delete: if false;
+      allow create: if isValidRsvp() || (isAdmin() && isValidRsvpAdmin());
+      allow update, delete: if isAdmin();
     }
   }
 }
