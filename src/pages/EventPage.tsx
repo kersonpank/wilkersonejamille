@@ -40,11 +40,42 @@ export function EventPage() {
     fetchEvent();
   }, [slug]);
 
+  useEffect(() => {
+    if (!event) return;
+    const pageUrl = window.location.href;
+    const setMeta = (attr: string, key: string, content: string) => {
+      let el = document.querySelector(`meta[${attr}="${key}"]`);
+      if (!el) { el = document.createElement('meta'); el.setAttribute(attr, key); document.head.appendChild(el); }
+      el.setAttribute('content', content);
+    };
+    document.title = `${event.title} — Wilkerson & Jamille`;
+    setMeta('property', 'og:title', `${event.title} — Wilkerson & Jamille`);
+    setMeta('property', 'og:description', event.headline);
+    setMeta('property', 'og:image', event.imageUrl);
+    setMeta('property', 'og:image:width', '1200');
+    setMeta('property', 'og:image:height', '630');
+    setMeta('property', 'og:url', pageUrl);
+    setMeta('property', 'og:type', 'website');
+    setMeta('name', 'twitter:card', 'summary_large_image');
+    setMeta('name', 'twitter:title', `${event.title} — Wilkerson & Jamille`);
+    setMeta('name', 'twitter:description', event.headline);
+    setMeta('name', 'twitter:image', event.imageUrl);
+    return () => { document.title = 'Wilkerson & Jamille'; };
+  }, [event]);
+
   const formatDate = (dateStr: string) => {
     const [year, month, day] = dateStr.split('-').map(Number);
     return new Date(year, month - 1, day).toLocaleDateString('pt-BR', {
       weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
     });
+  };
+
+  const formatPhone = (value: string) => {
+    const d = value.replace(/\D/g, '').slice(0, 11);
+    if (d.length <= 2) return d;
+    if (d.length <= 6) return `(${d.slice(0,2)}) ${d.slice(2)}`;
+    if (d.length <= 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+    return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
   };
 
   const handleRsvp = async (e: React.FormEvent) => {
@@ -209,8 +240,9 @@ export function EventPage() {
                         required
                         type="tel"
                         value={form.whatsapp}
-                        onChange={e => setForm(f => ({ ...f, whatsapp: e.target.value }))}
+                        onChange={e => setForm(f => ({ ...f, whatsapp: formatPhone(e.target.value) }))}
                         placeholder="(11) 99999-9999"
+                        inputMode="numeric"
                         className="w-full px-4 py-3 rounded-xl border border-[var(--color-nude-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] bg-gray-50/50"
                       />
                     </div>

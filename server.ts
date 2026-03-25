@@ -238,6 +238,39 @@ async function startServer() {
     }
   });
 
+  // Social media bot OG tag injection — WhatsApp/Facebook bots don't execute JS
+  const SOCIAL_BOTS = /WhatsApp|facebookexternalhit|Facebot|Twitterbot|LinkedInBot|TelegramBot|Slackbot|Discordbot/i;
+  app.get('/:slug', async (req, res, next) => {
+    const { slug } = req.params;
+    if (['presentes', 'admin'].includes(slug) || slug.startsWith('api')) return next();
+    const ua = req.headers['user-agent'] || '';
+    if (!SOCIAL_BOTS.test(ua)) return next();
+    try {
+      const snap = await db.collection('events').where('slug', '==', slug).limit(1).get();
+      if (snap.empty) return next();
+      const ev = snap.docs[0].data();
+      const appUrl = process.env.APP_URL || `https://${req.headers.host}`;
+      const pageUrl = `${appUrl}/${slug}`;
+      const esc = (s: string) => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      res.send(`<!DOCTYPE html><html lang="pt-BR"><head>
+<meta charset="UTF-8">
+<title>${esc(ev.title)} — Wilkerson &amp; Jamille</title>
+<meta property="og:type" content="website">
+<meta property="og:url" content="${esc(pageUrl)}">
+<meta property="og:title" content="${esc(ev.title)} — Wilkerson &amp; Jamille">
+<meta property="og:description" content="${esc(ev.headline)}">
+<meta property="og:image" content="${esc(ev.imageUrl)}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="pt_BR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${esc(ev.title)} — Wilkerson &amp; Jamille">
+<meta name="twitter:description" content="${esc(ev.headline)}">
+<meta name="twitter:image" content="${esc(ev.imageUrl)}">
+</head><body></body></html>`);
+    } catch { next(); }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

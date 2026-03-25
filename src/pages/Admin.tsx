@@ -463,6 +463,9 @@ export function Admin() {
                     </span>
                     <input type="file" accept="image/*" className="sr-only" onChange={handleEventImageChange} />
                   </label>
+                  <p className="text-xs text-[var(--color-ink-light)] mt-1.5">
+                    Recomendado: <strong>1200×630px</strong>, proporção 16:9, formato paisagem — aparece bem em celular e no preview do WhatsApp.
+                  </p>
                   {isUploadingImage && <p className="text-xs text-[var(--color-sage-dark)] mt-1">Enviando imagem…</p>}
                 </div>
                 <div className="grid grid-cols-2 gap-4">
