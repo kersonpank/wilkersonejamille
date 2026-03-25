@@ -313,37 +313,62 @@ async function startServer() {
     }
   });
 
-  // Reenvio manual de notificação a partir de um contributionId
+  // Envia notificação webhook — aceita { paymentId } ou { contributionId }
+  // paymentId: agrega todos os presentes do mesmo checkout (usado pelo fluxo automático)
+  // contributionId: envia só aquela contribuição (usado pelo botão manual do admin)
   app.post("/api/notify", async (req, res) => {
-    const { contributionId } = req.body;
-    if (!contributionId) {
-      return res.status(400).json({ error: "contributionId is required" });
+    const { contributionId, paymentId: paymentIdParam } = req.body;
+    if (!contributionId && !paymentIdParam) {
+      return res.status(400).json({ error: "contributionId or paymentId is required" });
     }
-    try {
-      const contribDoc = await db.collection('contributions').doc(contributionId).get();
-      if (!contribDoc.exists) {
-        return res.status(404).json({ error: "Contribution not found" });
-      }
-      const contrib = contribDoc.data()!;
 
+    try {
       const settingsDoc = await db.collection('settings').doc('notifications').get();
       const notifyUrl = settingsDoc.data()?.webhookUrl as string | undefined;
       if (!notifyUrl) {
         return res.status(400).json({ error: "Webhook URL not configured" });
       }
 
-      const giftDoc = await db.collection('gifts').doc(contrib.giftId).get();
-      const giftTitle = (giftDoc.data()?.title as string) ?? contrib.giftId;
+      let docs: FirebaseFirestore.QueryDocumentSnapshot[];
+
+      if (paymentIdParam) {
+        // Busca todas as contribuições deste pagamento (suporte a múltiplos presentes)
+        const snap = await db.collection('contributions')
+          .where('paymentId', '==', String(paymentIdParam))
+          .get();
+        docs = snap.docs;
+      } else {
+        const contribDoc = await db.collection('contributions').doc(contributionId).get();
+        if (!contribDoc.exists) {
+          return res.status(404).json({ error: "Contribution not found" });
+        }
+        docs = [contribDoc as FirebaseFirestore.QueryDocumentSnapshot];
+      }
+
+      if (docs.length === 0) {
+        return res.status(404).json({ error: "No contributions found" });
+      }
+
+      const first = docs[0].data();
+      const giftIds = [...new Set(docs.map(d => d.data().giftId as string))];
+      const giftTitles = await Promise.all(
+        giftIds.map(async id => {
+          const gDoc = await db.collection('gifts').doc(id).get();
+          return (gDoc.data()?.title as string) ?? id;
+        })
+      );
+
+      const totalAmount = docs.reduce((sum, d) => sum + (d.data().amount ?? 0), 0);
 
       const payload = {
         event: 'payment.approved',
-        paymentId: String(contrib.paymentId ?? ''),
-        guestName: contrib.guestName ?? '',
-        ...(contrib.message ? { message: contrib.message } : {}),
-        ...(contrib.paymentMethod ? { paymentMethod: contrib.paymentMethod } : {}),
-        amount: contrib.amount ?? 0,
-        ...(contrib.netAmount != null ? { netAmount: contrib.netAmount } : {}),
-        gifts: [giftTitle],
+        paymentId: String(first.paymentId ?? paymentIdParam ?? ''),
+        guestName: first.guestName ?? '',
+        ...(first.message ? { message: first.message } : {}),
+        ...(first.paymentMethod ? { paymentMethod: first.paymentMethod } : {}),
+        amount: totalAmount,
+        ...(first.netAmount != null ? { netAmount: first.netAmount } : {}),
+        gifts: giftTitles,
         timestamp: new Date().toISOString(),
       };
 
@@ -359,7 +384,7 @@ async function startServer() {
 
       res.json({ ok: true });
     } catch (error) {
-      console.error("Manual notify error:", error);
+      console.error("Notify error:", error);
       res.status(500).json({ error: "Failed to send notification" });
     }
   });

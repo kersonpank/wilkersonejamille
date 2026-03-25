@@ -5,7 +5,7 @@ import { db, auth, storage, loginWithGoogle, logout, handleFirestoreError, Opera
 import { Gift } from '../components/GiftCard';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
-import { Link2, Plus, Trash2, LogOut, Image as ImageIcon, AlertTriangle, Bell, Calendar, MapPin, Clock, Users, ExternalLink, Pencil, X, Send } from 'lucide-react';
+import { Link2, Plus, Trash2, LogOut, Image as ImageIcon, AlertTriangle, Bell, Calendar, MapPin, Clock, Users, ExternalLink, Pencil, X, Send, FileDown } from 'lucide-react';
 
 export function Admin() {
   const [user, setUser] = useState(auth.currentUser);
@@ -204,6 +204,92 @@ export function Admin() {
     } finally {
       setNotifyingId(null);
     }
+  };
+
+  const handleDeleteRsvp = async (rsvpId: string) => {
+    try {
+      await deleteDoc(doc(db, 'rsvps', rsvpId));
+      toast.success('Convidado removido da lista.');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, 'rsvps');
+    }
+  };
+
+  const handleExportGuestList = (ev: any, evRsvps: any[]) => {
+    const formatDate = (d: string) => {
+      if (!d) return '';
+      const [y, m, day] = d.split('-').map(Number);
+      return new Date(y, m - 1, day).toLocaleDateString('pt-BR', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+      });
+    };
+
+    const rows = evRsvps.map((r, i) => `
+      <tr>
+        <td class="num">${i + 1}</td>
+        <td class="name">${r.firstName ?? ''} ${r.lastName ?? ''}</td>
+        <td class="phone">${r.whatsapp || '—'}</td>
+      </tr>`).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Lista de Convidados — ${ev.title}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',sans-serif;color:#2C2C2C;background:#FDFBF7;padding:48px 56px;max-width:800px;margin:0 auto}
+    header{text-align:center;margin-bottom:40px;padding-bottom:32px;border-bottom:1px solid #E8E2D9}
+    .monogram{font-family:'Playfair Display',serif;font-size:2.2rem;letter-spacing:.2em;margin-bottom:6px}
+    .event-title{font-family:'Playfair Display',serif;font-size:1.6rem;margin-bottom:14px}
+    .event-meta{display:flex;justify-content:center;gap:24px;font-size:.8rem;color:#5A5A5A;flex-wrap:wrap}
+    h2{font-family:'Playfair Display',serif;font-size:.8rem;font-weight:400;color:#72826E;letter-spacing:.18em;text-transform:uppercase;margin:36px 0 16px}
+    table{width:100%;border-collapse:collapse}
+    thead tr{border-bottom:2px solid #2C2C2C}
+    th{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:#5A5A5A;padding:8px 12px;text-align:left}
+    th.num{width:44px;text-align:center}
+    tbody tr{border-bottom:1px solid #F0EBE3}
+    tbody tr:last-child{border-bottom:none}
+    td{padding:11px 12px;font-size:.9rem;vertical-align:middle}
+    td.num{text-align:center;color:#8A9A86;font-size:.8rem}
+    td.name{font-weight:500}
+    td.phone{color:#5A5A5A;font-size:.85rem}
+    .summary{margin-top:28px;padding-top:16px;border-top:1px solid #E8E2D9;display:flex;justify-content:space-between;align-items:center}
+    .count{font-family:'Playfair Display',serif;font-size:1.05rem}
+    .generated{font-size:.75rem;color:#8A9A86}
+    footer{text-align:center;margin-top:48px;font-family:'Playfair Display',serif;font-size:.85rem;color:#8A9A86;letter-spacing:.12em}
+    @media print{body{background:#fff;padding:24px 40px}@page{margin:1.2cm;size:A4}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="monogram">W &amp; J</div>
+    <h1 class="event-title">${ev.title}</h1>
+    <div class="event-meta">
+      ${ev.date ? `<span>📅 ${formatDate(ev.date)}</span>` : ''}
+      ${ev.time ? `<span>🕐 ${ev.time}h</span>` : ''}
+      ${ev.location ? `<span>📍 ${ev.location}</span>` : ''}
+    </div>
+  </header>
+  <h2>Convidados Confirmados</h2>
+  ${evRsvps.length === 0
+    ? '<p style="color:#5A5A5A;font-size:.9rem">Nenhum convidado confirmado ainda.</p>'
+    : `<table>
+        <thead><tr><th class="num">#</th><th>Nome</th><th>WhatsApp</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`}
+  <div class="summary">
+    <span class="count">${evRsvps.length} confirmação${evRsvps.length !== 1 ? 'ões' : ''}</span>
+    <span class="generated">Gerado em ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+  </div>
+  <footer>Wilkerson &amp; Jamille</footer>
+  <script>window.onload=()=>window.print()</script>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank', 'width=820,height=720');
+    if (win) { win.document.write(html); win.document.close(); }
   };
 
   const handleDelete = (id: string) => {
@@ -601,23 +687,44 @@ export function Admin() {
                       </div>
                       {/* RSVP section */}
                       <div className="border-t border-[var(--color-nude-dark)] px-4 py-3">
-                        <button
-                          onClick={() => setSelectedEventForRsvp(selectedEventForRsvp === ev.id ? null : ev.id)}
-                          className="flex items-center gap-2 text-sm font-medium text-[var(--color-sage-dark)] hover:text-[var(--color-ink)] transition-colors"
-                        >
-                          <Users className="w-4 h-4" />
-                          {evRsvps.length} confirmação(ões) de presença
-                          <span className="text-xs text-[var(--color-ink-light)]">{selectedEventForRsvp === ev.id ? '▲' : '▼'}</span>
-                        </button>
+                        <div className="flex items-center justify-between">
+                          <button
+                            onClick={() => setSelectedEventForRsvp(selectedEventForRsvp === ev.id ? null : ev.id)}
+                            className="flex items-center gap-2 text-sm font-medium text-[var(--color-sage-dark)] hover:text-[var(--color-ink)] transition-colors"
+                          >
+                            <Users className="w-4 h-4" />
+                            {evRsvps.length} confirmação(ões) de presença
+                            <span className="text-xs text-[var(--color-ink-light)]">{selectedEventForRsvp === ev.id ? '▲' : '▼'}</span>
+                          </button>
+                          {evRsvps.length > 0 && (
+                            <button
+                              onClick={() => handleExportGuestList(ev, evRsvps)}
+                              title="Exportar lista em PDF"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--color-sage-dark)] hover:bg-[var(--color-nude-dark)] transition-colors"
+                            >
+                              <FileDown className="w-3.5 h-3.5" />
+                              Exportar PDF
+                            </button>
+                          )}
+                        </div>
                         {selectedEventForRsvp === ev.id && (
-                          <div className="mt-3 space-y-2">
+                          <div className="mt-3 space-y-1">
                             {evRsvps.length === 0 ? (
                               <p className="text-xs text-[var(--color-ink-light)] py-2">Nenhuma confirmação ainda.</p>
                             ) : (
                               evRsvps.map(r => (
-                                <div key={r.id} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0">
+                                <div key={r.id} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0 group">
                                   <span className="font-medium text-[var(--color-ink)]">{r.firstName} {r.lastName}</span>
-                                  <span className="text-[var(--color-ink-light)]">{r.whatsapp}</span>
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-[var(--color-ink-light)]">{r.whatsapp}</span>
+                                    <button
+                                      onClick={() => handleDeleteRsvp(r.id)}
+                                      title="Remover convidado"
+                                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 text-red-400 hover:text-red-600 transition-all"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
                                 </div>
                               ))
                             )}

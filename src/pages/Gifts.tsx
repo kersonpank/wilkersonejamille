@@ -70,6 +70,16 @@ export function Gifts() {
         duration: 5000,
       });
 
+      // Se o pagamento já veio aprovado (PIX imediato, alguns cartões),
+      // dispara a notificação direto — sem depender do webhook assíncrono do Mercado Pago
+      if (data.status === 'approved') {
+        fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paymentId: data.paymentId }),
+        }).catch(() => { /* falha silenciosa — não afeta o fluxo do usuário */ });
+      }
+
       setCart([]);
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'contributions');
