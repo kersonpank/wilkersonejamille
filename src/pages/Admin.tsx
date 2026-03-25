@@ -194,7 +194,7 @@ export function Admin() {
         price: parseFloat(formData.price),
         description: formData.description,
         imageUrl: formData.imageUrl,
-        originalLink: formData.originalLink,
+        ...(formData.originalLink.trim() ? { originalLink: formData.originalLink.trim() } : {}),
         status: formData.status,
         createdAt: serverTimestamp(),
         authorUid: user.uid,
