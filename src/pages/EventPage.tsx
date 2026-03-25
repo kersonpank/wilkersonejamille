@@ -4,7 +4,7 @@ import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'fire
 import { db } from '../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
-import { MapPin, Calendar, Clock, Gift, CheckCircle, Users } from 'lucide-react';
+import { MapPin, Calendar, Clock, Gift, CheckCircle, Users, Heart } from 'lucide-react';
 
 interface Event {
   id: string;
@@ -311,14 +311,30 @@ export function EventPage() {
         </motion.section>
       </main>
 
-      <section className="max-w-2xl mx-auto w-full px-6 pb-16 text-center">
-        <Link
-          to="/"
-          className="inline-block px-8 py-4 border border-[var(--color-ink)] text-[var(--color-ink)] rounded-full font-medium hover:bg-[var(--color-ink)] hover:text-white transition-colors"
-        >
-          Conheça um pouco mais da nossa história
-        </Link>
-      </section>
+      <motion.section
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+        className="max-w-2xl mx-auto w-full px-6 pb-16"
+      >
+        <div className="relative rounded-3xl overflow-hidden">
+          <div className="absolute inset-0 bg-[var(--color-ink)]" />
+          <div className="relative px-8 py-10 text-center">
+            <Heart className="w-7 h-7 text-white/60 mx-auto mb-4" />
+            <h3 className="font-serif text-2xl text-white mb-2">Wilkerson & Jamille</h3>
+            <p className="text-white/70 text-sm leading-relaxed mb-6 max-w-xs mx-auto">
+              De passeios inesquecíveis a um novo lar. Conheça um pouco mais da nossa história.
+            </p>
+            <Link
+              to="/"
+              onClick={() => window.scrollTo({ top: 0 })}
+              className="inline-block px-7 py-3 bg-white text-[var(--color-ink)] rounded-full font-medium text-sm hover:bg-[var(--color-nude)] transition-colors"
+            >
+              Nossa História →
+            </Link>
+          </div>
+        </div>
+      </motion.section>
 
       <footer className="py-10 text-center border-t border-[var(--color-nude-dark)]">
         <p className="font-serif text-xl text-[var(--color-ink)]">W & J</p>
