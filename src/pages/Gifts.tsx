@@ -103,11 +103,11 @@ export function Gifts() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-grow pt-32 pb-24 px-6">
+      <main className="flex-grow pt-24 pb-16 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="font-serif text-4xl lg:text-5xl text-[var(--color-ink)] mb-4">Lista de Presentes</h2>
-            <p className="text-lg text-[var(--color-ink-light)] max-w-2xl mx-auto">
+          <div className="text-center mb-10 sm:mb-16">
+            <h2 className="font-serif text-3xl lg:text-5xl text-[var(--color-ink)] mb-4">Lista de Presentes</h2>
+            <p className="text-base sm:text-lg text-[var(--color-ink-light)] max-w-2xl mx-auto">
               Escolha um item com carinho para nos presentear e fazer parte da construção do nosso lar.
             </p>
           </div>
@@ -122,7 +122,7 @@ export function Gifts() {
               <p>Volte em breve!</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
               {gifts.map((gift) => (
                 <GiftCard key={gift.id} gift={gift} onSelect={handleSelectGift} />
               ))}

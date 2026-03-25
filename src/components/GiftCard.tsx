@@ -43,8 +43,8 @@ export function GiftCard({ gift, onSelect }: GiftCardProps) {
           </div>
         )}
       </div>
-      <div className="p-6 flex flex-col flex-grow">
-        <h3 className="font-serif text-lg text-[var(--color-ink)] mb-2 line-clamp-2">{gift.title}</h3>
+      <div className="p-4 sm:p-6 flex flex-col flex-grow">
+        <h3 className="font-serif text-base sm:text-lg text-[var(--color-ink)] mb-2 line-clamp-2">{gift.title}</h3>
         <p className="text-sm text-[var(--color-ink-light)] mb-4 flex-grow line-clamp-2">
           {gift.description}
         </p>

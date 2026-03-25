@@ -401,11 +401,11 @@ export function Admin() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 mt-8">
-        <div className="flex gap-4 mb-8 border-b border-[var(--color-nude-dark)]">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 mt-6 sm:mt-8">
+        <div className="flex gap-1 sm:gap-4 mb-8 border-b border-[var(--color-nude-dark)] overflow-x-auto scrollbar-none">
           <button
             onClick={() => setActiveTab('gifts')}
-            className={`pb-4 px-2 font-medium text-sm transition-colors relative ${
+            className={`pb-4 px-2 sm:px-3 font-medium text-sm transition-colors relative flex-shrink-0 ${
               activeTab === 'gifts' ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-light)] hover:text-[var(--color-ink)]'
             }`}
           >
@@ -416,7 +416,7 @@ export function Admin() {
           </button>
           <button
             onClick={() => setActiveTab('payments')}
-            className={`pb-4 px-2 font-medium text-sm transition-colors relative ${
+            className={`pb-4 px-2 sm:px-3 font-medium text-sm transition-colors relative flex-shrink-0 ${
               activeTab === 'payments' ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-light)] hover:text-[var(--color-ink)]'
             }`}
           >
@@ -427,7 +427,7 @@ export function Admin() {
           </button>
           <button
             onClick={() => setActiveTab('events')}
-            className={`pb-4 px-2 font-medium text-sm transition-colors relative ${
+            className={`pb-4 px-2 sm:px-3 font-medium text-sm transition-colors relative flex-shrink-0 ${
               activeTab === 'events' ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-light)] hover:text-[var(--color-ink)]'
             }`}
           >
@@ -904,7 +904,7 @@ export function Admin() {
               )}
             </div>
 
-            <div className="grid sm:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-[var(--color-nude-dark)]">
                 <p className="text-sm text-[var(--color-ink-light)] mb-2">Total Cobrado (Aprovado)</p>
                 <p className="font-serif text-2xl text-[var(--color-sage-dark)]">
@@ -980,7 +980,7 @@ export function Admin() {
             <p className="text-sm text-[var(--color-ink-light)] mb-4">
               Quando um pagamento for aprovado, o sistema enviará um POST com os dados para a URL abaixo.
             </p>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <input
                 type="url"
                 value={webhookUrl}
@@ -991,7 +991,7 @@ export function Admin() {
               <button
                 onClick={handleSaveWebhookUrl}
                 disabled={isSavingWebhook}
-                className="px-6 py-3 bg-[var(--color-ink)] text-white rounded-xl font-medium hover:bg-black transition-colors disabled:opacity-50 whitespace-nowrap text-sm"
+                className="px-6 py-3 bg-[var(--color-ink)] text-white rounded-xl font-medium hover:bg-black transition-colors disabled:opacity-50 whitespace-nowrap text-sm sm:w-auto w-full"
               >
                 {isSavingWebhook ? 'Salvando...' : 'Salvar'}
               </button>

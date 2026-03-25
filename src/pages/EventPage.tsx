@@ -138,7 +138,7 @@ export function EventPage() {
             transition={{ duration: 0.6 }}
           >
             <p className="text-white/70 uppercase tracking-[0.2em] text-xs mb-3">Wilkerson & Jamille</p>
-            <h1 className="font-serif text-4xl lg:text-6xl text-white leading-tight mb-2">{event.title}</h1>
+            <h1 className="font-serif text-2xl sm:text-4xl lg:text-6xl text-white leading-tight mb-2">{event.title}</h1>
           </motion.div>
         </div>
       </div>
@@ -319,7 +319,7 @@ export function EventPage() {
       >
         <div className="relative rounded-3xl overflow-hidden">
           <div className="absolute inset-0 bg-[var(--color-ink)]" />
-          <div className="relative px-8 py-10 text-center">
+          <div className="relative px-4 sm:px-8 py-8 sm:py-10 text-center">
             <Heart className="w-7 h-7 text-white/60 mx-auto mb-4" />
             <h3 className="font-serif text-2xl text-white mb-2">Wilkerson & Jamille</h3>
             <p className="text-white/70 text-sm leading-relaxed mb-6 max-w-xs mx-auto">

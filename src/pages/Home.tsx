@@ -55,13 +55,13 @@ function PhotoCarousel() {
         <>
           <button
             onClick={() => go(-1)}
-            className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white transition-colors z-10"
+            className="absolute left-3 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white transition-colors z-10"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
           <button
             onClick={() => go(1)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white transition-colors z-10"
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white transition-colors z-10"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -101,8 +101,8 @@ export function Home() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-20 px-6 lg:pt-48 lg:pb-32 overflow-hidden">
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
+      <section className="relative pt-24 pb-12 px-6 lg:pt-48 lg:pb-32 overflow-hidden">
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
@@ -112,10 +112,10 @@ export function Home() {
             <span className="text-[var(--color-sage-dark)] uppercase tracking-[0.2em] text-sm font-medium mb-4 block">
               Nossa Casa Nova
             </span>
-            <h2 className="font-serif text-5xl lg:text-7xl leading-[1.1] text-[var(--color-ink)] mb-6">
+            <h2 className="font-serif text-3xl sm:text-5xl lg:text-7xl leading-[1.1] text-[var(--color-ink)] mb-6">
               Wilkerson &<br />Jamille
             </h2>
-            <p className="text-lg text-[var(--color-ink-light)] max-w-md leading-relaxed mb-8">
+            <p className="text-base sm:text-lg text-[var(--color-ink-light)] max-w-md leading-relaxed mb-8">
               De passeios inesquecíveis no pôr do sol para a construção do nosso próprio lar. Cada detalhe tem um pouco de nós, e queremos você fazendo parte desse novo capítulo.
             </p>
             <button
@@ -137,14 +137,14 @@ export function Home() {
       </section>
 
       {/* Our Story */}
-      <section className="py-32 bg-white px-6 relative overflow-hidden">
+      <section className="py-16 lg:py-32 bg-white px-6 relative overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-16 bg-[var(--color-nude-dark)]" />
         <div className="max-w-3xl mx-auto text-center relative z-10">
           <span className="text-[var(--color-sage-dark)] uppercase tracking-[0.2em] text-xs font-medium mb-6 block">
             Como tudo começou
           </span>
-          <h3 className="font-serif text-4xl lg:text-5xl text-[var(--color-ink)] mb-10">Nossa História</h3>
-          <p className="text-lg lg:text-xl text-[var(--color-ink-light)] leading-relaxed font-light">
+          <h3 className="font-serif text-2xl sm:text-4xl lg:text-5xl text-[var(--color-ink)] mb-6 sm:mb-10">Nossa História</h3>
+          <p className="text-base lg:text-xl text-[var(--color-ink-light)] leading-relaxed font-light">
             De encontros cheios de risadas, passeios de cavalinho e pores do sol na roda gigante, até a decisão de passarmos uma vida inteira juntos. Nossa jornada tem sido a melhor aventura de todas. Agora, damos o próximo grande passo: construir o nosso lar. Agradecemos por fazerem parte da nossa história e por nos ajudarem a tornar a nossa casa ainda mais especial.
           </p>
         </div>
