@@ -33,6 +33,13 @@ export function Admin() {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [notifyingId, setNotifyingId] = useState<string | null>(null);
 
+  // Guest list edit/add state
+  const [addingGuestForEvent, setAddingGuestForEvent] = useState<string | null>(null);
+  const [addGuestForm, setAddGuestForm] = useState({ firstName: '', lastName: '', whatsapp: '' });
+  const [editingRsvpId, setEditingRsvpId] = useState<string | null>(null);
+  const [editRsvpForm, setEditRsvpForm] = useState({ firstName: '', lastName: '', whatsapp: '' });
+  const [isSavingGuest, setIsSavingGuest] = useState(false);
+
   // Events state
   const [events, setEvents] = useState<any[]>([]);
   const [rsvps, setRsvps] = useState<any[]>([]);
@@ -215,6 +222,46 @@ export function Admin() {
     }
   };
 
+  const handleAddRsvp = async (eventId: string) => {
+    if (!addGuestForm.firstName.trim()) return;
+    setIsSavingGuest(true);
+    try {
+      await addDoc(collection(db, 'rsvps'), {
+        eventId,
+        firstName: addGuestForm.firstName.trim(),
+        lastName: addGuestForm.lastName.trim(),
+        whatsapp: addGuestForm.whatsapp.trim(),
+        createdAt: serverTimestamp(),
+        addedManually: true,
+      });
+      toast.success('Convidado adicionado!');
+      setAddGuestForm({ firstName: '', lastName: '', whatsapp: '' });
+      setAddingGuestForEvent(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'rsvps');
+    } finally {
+      setIsSavingGuest(false);
+    }
+  };
+
+  const handleUpdateRsvp = async (rsvpId: string) => {
+    if (!editRsvpForm.firstName.trim()) return;
+    setIsSavingGuest(true);
+    try {
+      await updateDoc(doc(db, 'rsvps', rsvpId), {
+        firstName: editRsvpForm.firstName.trim(),
+        lastName: editRsvpForm.lastName.trim(),
+        whatsapp: editRsvpForm.whatsapp.trim(),
+      });
+      toast.success('Convidado atualizado!');
+      setEditingRsvpId(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `rsvps/${rsvpId}`);
+    } finally {
+      setIsSavingGuest(false);
+    }
+  };
+
   const handleExportGuestList = (ev: any, evRsvps: any[]) => {
     const formatDate = (d: string) => {
       if (!d) return '';
@@ -240,6 +287,7 @@ export function Admin() {
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:'Inter',sans-serif;color:#2C2C2C;background:#FDFBF7;padding:48px 56px;max-width:800px;margin:0 auto}
+    .page-header-repeat{display:none}
     header{text-align:center;margin-bottom:40px;padding-bottom:32px;border-bottom:1px solid #E8E2D9}
     .monogram{font-family:'Playfair Display',serif;font-size:2.2rem;letter-spacing:.2em;margin-bottom:6px}
     .event-title{font-family:'Playfair Display',serif;font-size:1.6rem;margin-bottom:14px}
@@ -259,10 +307,23 @@ export function Admin() {
     .count{font-family:'Playfair Display',serif;font-size:1.05rem}
     .generated{font-size:.75rem;color:#8A9A86}
     footer{text-align:center;margin-top:48px;font-family:'Playfair Display',serif;font-size:.85rem;color:#8A9A86;letter-spacing:.12em}
-    @media print{body{background:#fff;padding:24px 40px}@page{margin:1.2cm;size:A4}}
+    @media print{
+      body{background:#fff;padding:80px 40px 24px}
+      @page{margin:1.2cm;size:A4}
+      .page-header-repeat{display:block;position:fixed;top:0;left:0;right:0;background:#fff;border-bottom:1px solid #E8E2D9;padding:8px 40px;text-align:center}
+      .page-footer-repeat{display:block;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #E8E2D9;padding:6px 40px;text-align:center}
+    }
   </style>
 </head>
 <body>
+  <!-- Repeats on every printed page -->
+  <div class="page-header-repeat">
+    <span style="font-family:'Playfair Display',serif;font-size:1rem;letter-spacing:.15em">W &amp; J</span>
+    <span style="font-size:.7rem;color:#8A9A86;margin-left:12px">Wilkerson &amp; Jamille</span>
+  </div>
+  <div class="page-footer-repeat">
+    <span style="font-family:'Playfair Display',serif;font-size:.75rem;color:#8A9A86;letter-spacing:.1em">Wilkerson &amp; Jamille</span>
+  </div>
   <header>
     <div class="monogram">W &amp; J</div>
     <h1 class="event-title">${ev.title}</h1>
@@ -696,37 +757,148 @@ export function Admin() {
                             {evRsvps.length} confirmação(ões) de presença
                             <span className="text-xs text-[var(--color-ink-light)]">{selectedEventForRsvp === ev.id ? '▲' : '▼'}</span>
                           </button>
-                          {evRsvps.length > 0 && (
+                          <div className="flex items-center gap-1">
                             <button
-                              onClick={() => handleExportGuestList(ev, evRsvps)}
-                              title="Exportar lista em PDF"
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--color-sage-dark)] hover:bg-[var(--color-nude-dark)] transition-colors"
+                              onClick={() => {
+                                setSelectedEventForRsvp(ev.id);
+                                setAddingGuestForEvent(addingGuestForEvent === ev.id ? null : ev.id);
+                                setAddGuestForm({ firstName: '', lastName: '', whatsapp: '' });
+                                setEditingRsvpId(null);
+                              }}
+                              title="Adicionar convidado manualmente"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--color-ink-light)] hover:bg-[var(--color-nude-dark)] transition-colors"
                             >
-                              <FileDown className="w-3.5 h-3.5" />
-                              Exportar PDF
+                              <Plus className="w-3.5 h-3.5" />
+                              Adicionar
                             </button>
-                          )}
+                            {evRsvps.length > 0 && (
+                              <button
+                                onClick={() => handleExportGuestList(ev, evRsvps)}
+                                title="Exportar lista em PDF"
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--color-sage-dark)] hover:bg-[var(--color-nude-dark)] transition-colors"
+                              >
+                                <FileDown className="w-3.5 h-3.5" />
+                                Exportar PDF
+                              </button>
+                            )}
+                          </div>
                         </div>
                         {selectedEventForRsvp === ev.id && (
-                          <div className="mt-3 space-y-1">
-                            {evRsvps.length === 0 ? (
+                          <div className="mt-3 space-y-0.5">
+                            {evRsvps.length === 0 && addingGuestForEvent !== ev.id && (
                               <p className="text-xs text-[var(--color-ink-light)] py-2">Nenhuma confirmação ainda.</p>
-                            ) : (
-                              evRsvps.map(r => (
-                                <div key={r.id} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0 group">
+                            )}
+                            {evRsvps.map(r => (
+                              editingRsvpId === r.id ? (
+                                <div key={r.id} className="py-2 border-b border-gray-100 last:border-0">
+                                  <div className="flex gap-2 flex-wrap items-center">
+                                    <input
+                                      autoFocus
+                                      value={editRsvpForm.firstName}
+                                      onChange={e => setEditRsvpForm(f => ({ ...f, firstName: e.target.value }))}
+                                      placeholder="Nome *"
+                                      className="flex-1 min-w-[80px] px-2 py-1 text-sm rounded-lg border border-[var(--color-nude-dark)] focus:outline-none focus:ring-1 focus:ring-[var(--color-sage)]"
+                                    />
+                                    <input
+                                      value={editRsvpForm.lastName}
+                                      onChange={e => setEditRsvpForm(f => ({ ...f, lastName: e.target.value }))}
+                                      placeholder="Sobrenome"
+                                      className="flex-1 min-w-[80px] px-2 py-1 text-sm rounded-lg border border-[var(--color-nude-dark)] focus:outline-none focus:ring-1 focus:ring-[var(--color-sage)]"
+                                    />
+                                    <input
+                                      value={editRsvpForm.whatsapp}
+                                      onChange={e => setEditRsvpForm(f => ({ ...f, whatsapp: e.target.value }))}
+                                      placeholder="WhatsApp"
+                                      className="flex-1 min-w-[100px] px-2 py-1 text-sm rounded-lg border border-[var(--color-nude-dark)] focus:outline-none focus:ring-1 focus:ring-[var(--color-sage)]"
+                                    />
+                                    <div className="flex gap-1 shrink-0">
+                                      <button
+                                        onClick={() => handleUpdateRsvp(r.id)}
+                                        disabled={isSavingGuest || !editRsvpForm.firstName.trim()}
+                                        className="px-3 py-1 text-xs font-medium bg-[var(--color-sage)] text-white rounded-lg hover:bg-[var(--color-sage-dark)] disabled:opacity-50 transition-colors"
+                                      >
+                                        Salvar
+                                      </button>
+                                      <button
+                                        onClick={() => setEditingRsvpId(null)}
+                                        className="p-1 text-[var(--color-ink-light)] hover:text-[var(--color-ink)] rounded-lg transition-colors"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div key={r.id} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0">
                                   <span className="font-medium text-[var(--color-ink)]">{r.firstName} {r.lastName}</span>
-                                  <div className="flex items-center gap-3">
-                                    <span className="text-[var(--color-ink-light)]">{r.whatsapp}</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[var(--color-ink-light)] text-xs">{r.whatsapp}</span>
+                                    <button
+                                      onClick={() => {
+                                        setEditingRsvpId(r.id);
+                                        setEditRsvpForm({ firstName: r.firstName ?? '', lastName: r.lastName ?? '', whatsapp: r.whatsapp ?? '' });
+                                      }}
+                                      title="Editar"
+                                      className="p-1 rounded hover:bg-gray-100 text-[var(--color-ink-light)] hover:text-[var(--color-sage-dark)] transition-colors"
+                                    >
+                                      <Pencil className="w-3 h-3" />
+                                    </button>
                                     <button
                                       onClick={() => handleDeleteRsvp(r.id)}
                                       title="Remover convidado"
-                                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 text-red-400 hover:text-red-600 transition-all"
+                                      className="p-1 rounded hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors"
                                     >
                                       <X className="w-3.5 h-3.5" />
                                     </button>
                                   </div>
                                 </div>
-                              ))
+                              )
+                            ))}
+                            {/* Add guest inline form */}
+                            {addingGuestForEvent === ev.id && (
+                              <div className="mt-2 pt-3 border-t border-[var(--color-nude-dark)]">
+                                <p className="text-xs font-medium text-[var(--color-ink-light)] mb-2">Novo convidado:</p>
+                                <div className="flex gap-2 flex-wrap items-center">
+                                  <input
+                                    autoFocus
+                                    value={addGuestForm.firstName}
+                                    onChange={e => setAddGuestForm(f => ({ ...f, firstName: e.target.value }))}
+                                    onKeyDown={e => e.key === 'Enter' && handleAddRsvp(ev.id)}
+                                    placeholder="Nome *"
+                                    className="flex-1 min-w-[80px] px-2 py-1.5 text-sm rounded-lg border border-[var(--color-nude-dark)] focus:outline-none focus:ring-1 focus:ring-[var(--color-sage)]"
+                                  />
+                                  <input
+                                    value={addGuestForm.lastName}
+                                    onChange={e => setAddGuestForm(f => ({ ...f, lastName: e.target.value }))}
+                                    onKeyDown={e => e.key === 'Enter' && handleAddRsvp(ev.id)}
+                                    placeholder="Sobrenome"
+                                    className="flex-1 min-w-[80px] px-2 py-1.5 text-sm rounded-lg border border-[var(--color-nude-dark)] focus:outline-none focus:ring-1 focus:ring-[var(--color-sage)]"
+                                  />
+                                  <input
+                                    value={addGuestForm.whatsapp}
+                                    onChange={e => setAddGuestForm(f => ({ ...f, whatsapp: e.target.value }))}
+                                    onKeyDown={e => e.key === 'Enter' && handleAddRsvp(ev.id)}
+                                    placeholder="WhatsApp"
+                                    className="flex-1 min-w-[100px] px-2 py-1.5 text-sm rounded-lg border border-[var(--color-nude-dark)] focus:outline-none focus:ring-1 focus:ring-[var(--color-sage)]"
+                                  />
+                                  <div className="flex gap-1 shrink-0">
+                                    <button
+                                      onClick={() => handleAddRsvp(ev.id)}
+                                      disabled={isSavingGuest || !addGuestForm.firstName.trim()}
+                                      className="px-3 py-1.5 text-xs font-medium bg-[var(--color-ink)] text-white rounded-lg hover:bg-black disabled:opacity-50 transition-colors flex items-center gap-1"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                      {isSavingGuest ? 'Salvando…' : 'Confirmar'}
+                                    </button>
+                                    <button
+                                      onClick={() => setAddingGuestForEvent(null)}
+                                      className="p-1.5 text-[var(--color-ink-light)] hover:text-[var(--color-ink)] rounded-lg transition-colors"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
                             )}
                           </div>
                         )}
