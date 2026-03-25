@@ -238,6 +238,23 @@ async function startServer() {
     }
   });
 
+  // Image proxy — serves event image from our domain (WhatsApp/Facebook trust own-domain images more)
+  app.get('/api/og-image/:slug', async (req, res) => {
+    try {
+      const snap = await db.collection('events').where('slug', '==', req.params.slug).limit(1).get();
+      if (snap.empty) return res.status(404).end();
+      const imageUrl = snap.docs[0].data().imageUrl as string;
+      if (!imageUrl) return res.status(404).end();
+      const imgRes = await fetch(imageUrl);
+      if (!imgRes.ok) return res.status(502).end();
+      const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      const buf = await imgRes.arrayBuffer();
+      res.send(Buffer.from(buf));
+    } catch { res.status(500).end(); }
+  });
+
   // Social media bot OG tag injection — WhatsApp/Facebook bots don't execute JS
   const SOCIAL_BOTS = /WhatsApp|facebookexternalhit|Facebot|Twitterbot|LinkedInBot|TelegramBot|Slackbot|Discordbot/i;
   app.get('/:slug', async (req, res, next) => {
@@ -251,22 +268,32 @@ async function startServer() {
       const ev = snap.docs[0].data();
       const appUrl = process.env.APP_URL || `https://${req.headers.host}`;
       const pageUrl = `${appUrl}/${slug}`;
+      const imageUrl = `${appUrl}/api/og-image/${slug}`;
       const esc = (s: string) => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      // Build rich description with date, time and location
+      const formatDate = (d: string) => {
+        const [y,m,day] = d.split('-').map(Number);
+        return new Date(y, m-1, day).toLocaleDateString('pt-BR', { weekday:'long', day:'numeric', month:'long' });
+      };
+      const description = ev.date
+        ? `${formatDate(ev.date)} às ${ev.time}h · ${ev.location} · Confirme sua presença!`
+        : ev.headline;
       res.send(`<!DOCTYPE html><html lang="pt-BR"><head>
 <meta charset="UTF-8">
 <title>${esc(ev.title)} — Wilkerson &amp; Jamille</title>
 <meta property="og:type" content="website">
 <meta property="og:url" content="${esc(pageUrl)}">
 <meta property="og:title" content="${esc(ev.title)} — Wilkerson &amp; Jamille">
-<meta property="og:description" content="${esc(ev.headline)}">
-<meta property="og:image" content="${esc(ev.imageUrl)}">
+<meta property="og:description" content="${esc(description)}">
+<meta property="og:image" content="${esc(imageUrl)}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/jpeg">
 <meta property="og:locale" content="pt_BR">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${esc(ev.title)} — Wilkerson &amp; Jamille">
-<meta name="twitter:description" content="${esc(ev.headline)}">
-<meta name="twitter:image" content="${esc(ev.imageUrl)}">
+<meta name="twitter:description" content="${esc(description)}">
+<meta name="twitter:image" content="${esc(imageUrl)}">
 </head><body></body></html>`);
     } catch { next(); }
   });
