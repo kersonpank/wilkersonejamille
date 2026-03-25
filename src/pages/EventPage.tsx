@@ -311,6 +311,15 @@ export function EventPage() {
         </motion.section>
       </main>
 
+      <section className="max-w-2xl mx-auto w-full px-6 pb-16 text-center">
+        <Link
+          to="/"
+          className="inline-block px-8 py-4 border border-[var(--color-ink)] text-[var(--color-ink)] rounded-full font-medium hover:bg-[var(--color-ink)] hover:text-white transition-colors"
+        >
+          Conheça um pouco mais da nossa história
+        </Link>
+      </section>
+
       <footer className="py-10 text-center border-t border-[var(--color-nude-dark)]">
         <p className="font-serif text-xl text-[var(--color-ink)]">W & J</p>
         <p className="text-sm text-[var(--color-ink-light)] mt-1">Com amor, Wilkerson & Jamille.</p>
