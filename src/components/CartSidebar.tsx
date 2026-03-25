@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Trash2 } from 'lucide-react';
+import { X, Trash2, Plus } from 'lucide-react';
 import { Gift } from './GiftCard';
 
 interface CartSidebarProps {
@@ -74,12 +74,29 @@ export function CartSidebar({ isOpen, onClose, cartItems, onRemove, onCheckout }
 
             {cartItems.length > 0 && (
               <div className="p-6 bg-white border-t border-[var(--color-nude-dark)] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex justify-between items-center mb-5">
                   <span className="text-[var(--color-ink-light)]">Subtotal</span>
                   <span className="font-serif text-2xl text-[var(--color-ink)]">
                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}
                   </span>
                 </div>
+
+                {/* Nudge sutil para aumentar o ticket */}
+                {cartItems.length === 1 && (
+                  <p className="text-xs text-[var(--color-ink-light)] text-center mb-3 leading-relaxed">
+                    Cada presente faz parte da nossa história. 💛<br />
+                    <span className="text-[var(--color-sage-dark)]">Quer tornar esse momento ainda mais especial?</span>
+                  </p>
+                )}
+
+                <button
+                  onClick={onClose}
+                  className="w-full py-3 mb-3 flex items-center justify-center gap-2 rounded-full border border-[var(--color-nude-dark)] text-[var(--color-ink)] text-sm font-medium hover:border-[var(--color-sage)] hover:text-[var(--color-sage-dark)] transition-colors bg-[var(--color-nude)]"
+                >
+                  <Plus className="w-4 h-4" />
+                  Adicionar outro presente
+                </button>
+
                 <button
                   onClick={onCheckout}
                   className="w-full py-4 bg-[var(--color-ink)] text-white rounded-full font-medium tracking-wide hover:bg-black transition-colors"
