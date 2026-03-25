@@ -269,8 +269,10 @@ async function startServer() {
               const settingsDoc = await db.collection('settings').doc('notifications').get();
               const notifyUrl = settingsDoc.data()?.webhookUrl as string | undefined;
               if (notifyUrl) {
-                const guestName = snapshot.docs[0]?.data().guestName ?? '';
-                const guestMessage = snapshot.docs[0]?.data().message ?? '';
+                const firstDoc = snapshot.docs[0]?.data();
+                const guestName = firstDoc?.guestName ?? '';
+                const guestMessage = firstDoc?.message ?? '';
+                const paymentMethod = firstDoc?.paymentMethod ?? '';
                 const giftIds = [...new Set(snapshot.docs.map(d => d.data().giftId as string))];
                 const giftTitles = await Promise.all(
                   giftIds.map(async id => {
@@ -286,7 +288,8 @@ async function startServer() {
                     paymentId: String(paymentId),
                     guestName,
                     ...(guestMessage ? { message: guestMessage } : {}),
-                    amount: snapshot.docs[0]?.data().amount ?? 0,
+                    ...(paymentMethod ? { paymentMethod } : {}),
+                    amount: firstDoc?.amount ?? 0,
                     netAmount,
                     gifts: giftTitles,
                     timestamp: new Date().toISOString(),
@@ -307,6 +310,57 @@ async function startServer() {
     } catch (error) {
       console.error("Webhook error:", error);
       res.status(500).send("Webhook Error");
+    }
+  });
+
+  // Reenvio manual de notificação a partir de um contributionId
+  app.post("/api/notify", async (req, res) => {
+    const { contributionId } = req.body;
+    if (!contributionId) {
+      return res.status(400).json({ error: "contributionId is required" });
+    }
+    try {
+      const contribDoc = await db.collection('contributions').doc(contributionId).get();
+      if (!contribDoc.exists) {
+        return res.status(404).json({ error: "Contribution not found" });
+      }
+      const contrib = contribDoc.data()!;
+
+      const settingsDoc = await db.collection('settings').doc('notifications').get();
+      const notifyUrl = settingsDoc.data()?.webhookUrl as string | undefined;
+      if (!notifyUrl) {
+        return res.status(400).json({ error: "Webhook URL not configured" });
+      }
+
+      const giftDoc = await db.collection('gifts').doc(contrib.giftId).get();
+      const giftTitle = (giftDoc.data()?.title as string) ?? contrib.giftId;
+
+      const payload = {
+        event: 'payment.approved',
+        paymentId: String(contrib.paymentId ?? ''),
+        guestName: contrib.guestName ?? '',
+        ...(contrib.message ? { message: contrib.message } : {}),
+        ...(contrib.paymentMethod ? { paymentMethod: contrib.paymentMethod } : {}),
+        amount: contrib.amount ?? 0,
+        ...(contrib.netAmount != null ? { netAmount: contrib.netAmount } : {}),
+        gifts: [giftTitle],
+        timestamp: new Date().toISOString(),
+      };
+
+      const webhookRes = await fetch(notifyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!webhookRes.ok) {
+        return res.status(502).json({ error: `Webhook returned ${webhookRes.status}` });
+      }
+
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Manual notify error:", error);
+      res.status(500).json({ error: "Failed to send notification" });
     }
   });
 

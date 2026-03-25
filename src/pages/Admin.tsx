@@ -5,7 +5,7 @@ import { db, auth, storage, loginWithGoogle, logout, handleFirestoreError, Opera
 import { Gift } from '../components/GiftCard';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
-import { Link2, Plus, Trash2, LogOut, Image as ImageIcon, AlertTriangle, Bell, Calendar, MapPin, Clock, Users, ExternalLink, Pencil, X } from 'lucide-react';
+import { Link2, Plus, Trash2, LogOut, Image as ImageIcon, AlertTriangle, Bell, Calendar, MapPin, Clock, Users, ExternalLink, Pencil, X, Send } from 'lucide-react';
 
 export function Admin() {
   const [user, setUser] = useState(auth.currentUser);
@@ -31,6 +31,7 @@ export function Admin() {
   const [contributions, setContributions] = useState<any[]>([]);
   const [isClearingHistory, setIsClearingHistory] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [notifyingId, setNotifyingId] = useState<string | null>(null);
 
   // Events state
   const [events, setEvents] = useState<any[]>([]);
@@ -182,6 +183,26 @@ export function Admin() {
       setLinkInput('');
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'gifts');
+    }
+  };
+
+  const handleNotify = async (contributionId: string) => {
+    setNotifyingId(contributionId);
+    try {
+      const res = await fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contributionId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Erro ${res.status}`);
+      }
+      toast.success('Notificação reenviada com sucesso!');
+    } catch (error: any) {
+      toast.error(`Falha ao reenviar: ${error.message}`);
+    } finally {
+      setNotifyingId(null);
     }
   };
 
@@ -659,7 +680,7 @@ export function Admin() {
                               {c.message && <span className="italic"> — "{c.message}"</span>}
                             </p>
                           </div>
-                          <div className="text-right shrink-0">
+                          <div className="text-right shrink-0 flex flex-col items-end gap-1">
                             <p className="font-serif text-lg text-[var(--color-sage-dark)]">
                               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(c.amount)}
                             </p>
@@ -668,9 +689,18 @@ export function Admin() {
                                 líquido: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(c.netAmount)}
                               </p>
                             )}
-                            <p className="text-xs text-[var(--color-ink-light)] mt-0.5">
+                            <p className="text-xs text-[var(--color-ink-light)]">
                               {c.createdAt?.toDate ? new Date(c.createdAt.toDate()).toLocaleDateString('pt-BR') : ''}
                             </p>
+                            <button
+                              onClick={() => handleNotify(c.id)}
+                              disabled={notifyingId === c.id}
+                              title="Reenviar notificação"
+                              className="mt-1 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[var(--color-nude-dark)] text-[var(--color-ink)] hover:bg-[var(--color-sage)] hover:text-white transition-colors disabled:opacity-50"
+                            >
+                              <Send className="w-3 h-3" />
+                              {notifyingId === c.id ? 'Enviando...' : 'Notificar'}
+                            </button>
                           </div>
                         </div>
                       );
