@@ -1,6 +1,85 @@
-import React from 'react';
-import { motion } from 'motion/react';
+import React, { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Link, useNavigate } from 'react-router-dom';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+
+// Descobre todas as fotos em src/assets/fotos/ automaticamente
+const photoModules = import.meta.glob('../assets/fotos/*.{jpg,jpeg,png,webp,JPG,JPEG,PNG,WEBP}', { eager: true });
+const PHOTOS: string[] = Object.values(photoModules).map((m: any) => m.default);
+// Fallback se ainda não tiver nenhuma foto
+if (PHOTOS.length === 0) PHOTOS.push('/nossa-foto.jpg');
+
+function PhotoCarousel() {
+  const [current, setCurrent] = useState(0);
+  const [direction, setDirection] = useState(1);
+  const total = PHOTOS.length;
+
+  useEffect(() => {
+    if (total <= 1) return;
+    const id = setInterval(() => {
+      setDirection(1);
+      setCurrent(c => (c + 1) % total);
+    }, 5000);
+    return () => clearInterval(id);
+  }, [total]);
+
+  const go = (delta: number) => {
+    setDirection(delta);
+    setCurrent(c => (c + delta + total) % total);
+  };
+
+  return (
+    <div className="relative h-[60vh] lg:h-[80vh] rounded-[2rem] overflow-hidden shadow-2xl bg-gray-100">
+      <AnimatePresence initial={false} custom={direction} mode="sync">
+        <motion.img
+          key={current}
+          src={PHOTOS[current]}
+          alt={`Foto ${current + 1}`}
+          custom={direction}
+          variants={{
+            enter: (d: number) => ({ x: d > 0 ? '100%' : '-100%', opacity: 0 }),
+            center: { x: 0, opacity: 1 },
+            exit: (d: number) => ({ x: d > 0 ? '-100%' : '100%', opacity: 0 }),
+          }}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          transition={{ duration: 0.5, ease: 'easeInOut' }}
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      </AnimatePresence>
+
+      <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
+
+      {total > 1 && (
+        <>
+          <button
+            onClick={() => go(-1)}
+            className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white transition-colors z-10"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => go(1)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white transition-colors z-10"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+            {PHOTOS.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => { setDirection(i > current ? 1 : -1); setCurrent(i); }}
+                className={`w-1.5 h-1.5 rounded-full transition-all ${i === current ? 'bg-white w-4' : 'bg-white/50'}`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export function Home() {
   const navigate = useNavigate();
@@ -51,18 +130,8 @@ export function Home() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1, delay: 0.2 }}
-            className="relative h-[60vh] lg:h-[80vh] rounded-[2rem] overflow-hidden shadow-2xl"
           >
-            <img
-              src="/nossa-foto.jpg"
-              alt="Wilkerson & Jamille na Roda Gigante"
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                // Fallback if the image is not uploaded yet
-                e.currentTarget.src = "https://picsum.photos/seed/sunsetcouple/800/1200";
-              }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+            <PhotoCarousel />
           </motion.div>
         </div>
       </section>
