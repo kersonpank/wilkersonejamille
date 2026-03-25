@@ -333,34 +333,41 @@ async function startServer() {
       // Layer 1: free HTML scraping
       let { title, price, description, imageUrl } = extractWithCheerio($, url);
 
-      // Layer 2: Gemini fallback — only when essential fields are missing
+      // Layer 2: Gemini com urlContext — acessa e renderiza a URL real, usado quando scraping falha
+      // Sites como Mercado Livre, Shopee, etc. carregam dados via JS e o HTML estático fica vazio
       const geminiKey = process.env.GEMINI_API_KEY;
-      if (geminiKey && (!title || price === null)) {
+      if (geminiKey && price === null) {
         try {
           const { GoogleGenAI } = await import('@google/genai');
           const ai = new GoogleGenAI({ apiKey: geminiKey });
-          const prompt = `Você é um extrator de dados de produtos. Extraia informações do seguinte HTML de página de e-commerce.
-Dados já extraídos: title="${title}", price="${price ?? ''}", description="${description}", imageUrl="${imageUrl}"
-Preencha APENAS os campos que estão vazios ou nulos. Não modifique campos que já têm valor.
-Retorne JSON com: title (string), price (número em BRL, ex: 1299.90), description (string, máx 200 chars), imageUrl (URL absoluta ou string vazia).
-NÃO invente URLs de imagem. Se não encontrar URL real, retorne "".
-
-HTML (truncado):
-${html.slice(0, 100000)}`;
 
           const aiResponse = await ai.models.generateContent({
             model: 'gemini-2.0-flash',
-            contents: prompt,
-            config: { responseMimeType: 'application/json' },
+            contents: `Acesse a URL e extraia as informações reais do produto: ${url}.
+Retorne APENAS um JSON válido com estas chaves exatas:
+{"title":"nome do produto","price":1299.90,"description":"descrição breve","imageUrl":"https://..."}
+- title: nome exato do produto (string)
+- price: preço em BRL como número puro, sem R$ (number)
+- description: descrição breve, máx 200 chars (string)
+- imageUrl: URL absoluta real da imagem principal (string, vazia "" se não encontrar)
+NÃO invente imageUrl. Retorne somente o JSON, sem markdown, sem texto adicional.`,
+            config: {
+              tools: [{ urlContext: {} }],
+              responseMimeType: 'application/json',
+            },
           });
 
-          const aiData = JSON.parse(aiResponse.text || '{}');
-          if (!title && aiData.title) title = String(aiData.title).trim();
-          if (price === null && aiData.price != null) price = parseFloat(String(aiData.price)) || null;
-          if (!description && aiData.description) description = String(aiData.description).trim().slice(0, 300);
+          console.log('[Gemini] raw response:', aiResponse.text?.slice(0, 300));
+          const rawText = (aiResponse.text || '').replace(/```json|```/g, '').trim();
+          const aiData = JSON.parse(rawText || '{}');
+          // Gemini com urlContext é mais confiável que scraping estático para sites JS-heavy
+          if (aiData.title) title = String(aiData.title).trim();
+          if (aiData.price != null) price = parseFloat(String(aiData.price)) || null;
+          if (aiData.description) description = String(aiData.description).trim().slice(0, 300);
+          // Preferir imageUrl do Cheerio (já validada como URL absoluta), cair no Gemini se vazia
           if (!imageUrl && aiData.imageUrl) imageUrl = String(aiData.imageUrl).trim();
         } catch (geminiError) {
-          console.error('Gemini fallback error (non-fatal):', geminiError);
+          console.error('[Gemini] fallback error:', geminiError);
         }
       }
 
