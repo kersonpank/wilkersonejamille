@@ -270,6 +270,7 @@ async function startServer() {
               const notifyUrl = settingsDoc.data()?.webhookUrl as string | undefined;
               if (notifyUrl) {
                 const guestName = snapshot.docs[0]?.data().guestName ?? '';
+                const guestMessage = snapshot.docs[0]?.data().message ?? '';
                 const giftIds = [...new Set(snapshot.docs.map(d => d.data().giftId as string))];
                 const giftTitles = await Promise.all(
                   giftIds.map(async id => {
@@ -284,6 +285,7 @@ async function startServer() {
                     event: 'payment.approved',
                     paymentId: String(paymentId),
                     guestName,
+                    ...(guestMessage ? { message: guestMessage } : {}),
                     amount: snapshot.docs[0]?.data().amount ?? 0,
                     netAmount,
                     gifts: giftTitles,
