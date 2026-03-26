@@ -1,16 +1,27 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, CheckCircle } from 'lucide-react';
+import { X, CheckCircle, ChevronDown } from 'lucide-react';
 import { Gift } from './GiftCard';
 import { initMercadoPago, Payment, StatusScreen } from '@mercadopago/sdk-react';
 
 initMercadoPago(import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY, { locale: 'pt-BR' });
 
+const fmt = (v: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+
 interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
   cartItems: Gift[];
-  onSubmit: (data: { name: string; message: string; method: string; paymentId: string; status: string; netAmount?: number | null }) => void;
+  onSubmit: (data: {
+    name: string;
+    message: string;
+    method: string;
+    paymentId: string;
+    status: string;
+    netAmount?: number | null;
+    amounts?: Record<string, number>;
+  }) => void;
 }
 
 export function CheckoutModal({ isOpen, onClose, cartItems, onSubmit }: CheckoutModalProps) {
@@ -18,14 +29,27 @@ export function CheckoutModal({ isOpen, onClose, cartItems, onSubmit }: Checkout
   const [message, setMessage] = useState('');
   const [confirmedPaymentId, setConfirmedPaymentId] = useState<string | null>(null);
   const [confirmedStatus, setConfirmedStatus] = useState<string>('');
+  // giftId → number of parts selected (0 or undefined = full price)
+  const [partialSelections, setPartialSelections] = useState<Record<string, number>>({});
+  const [expandedPartial, setExpandedPartial] = useState<string | null>(null);
 
-  const total = cartItems.reduce((acc, item) => acc + item.price, 0);
+  const effectivePrice = (item: Gift) => {
+    const sel = partialSelections[item.id];
+    if (item.allowPartial && item.totalParts && sel && sel > 0) {
+      return (item.price / item.totalParts) * sel;
+    }
+    return item.price;
+  };
+
+  const total = cartItems.reduce((acc, item) => acc + effectivePrice(item), 0);
 
   const handleClose = () => {
     setConfirmedPaymentId(null);
     setConfirmedStatus('');
     setName('');
     setMessage('');
+    setPartialSelections({});
+    setExpandedPartial(null);
     onClose();
   };
 
@@ -42,7 +66,9 @@ export function CheckoutModal({ isOpen, onClose, cartItems, onSubmit }: Checkout
             console.error("Payment error:", response.detail);
             reject();
           } else {
-            // Record contribution immediately
+            const amounts = Object.fromEntries(
+              cartItems.map((item) => [item.id, effectivePrice(item)])
+            );
             onSubmit({
               name,
               message,
@@ -50,8 +76,8 @@ export function CheckoutModal({ isOpen, onClose, cartItems, onSubmit }: Checkout
               paymentId: String(response.id),
               status: response.status,
               netAmount: response.net_received_amount ?? null,
+              amounts,
             });
-            // Show StatusScreen (QR code for Pix, success/failure for cards)
             setConfirmedPaymentId(String(response.id));
             setConfirmedStatus(response.status);
             resolve();
@@ -105,14 +131,12 @@ export function CheckoutModal({ isOpen, onClose, cartItems, onSubmit }: Checkout
 
               <div className="p-6 overflow-y-auto flex-1">
                 {confirmedPaymentId ? (
-                  /* Status Screen — shows QR code for Pix, status for cards */
                   <div>
                     <StatusScreen
                       initialization={{ paymentId: confirmedPaymentId }}
                       onReady={() => {}}
                       onError={(error) => console.error('StatusScreen error:', error)}
                     />
-                    {/* Close button after showing status */}
                     <button
                       onClick={handleClose}
                       className="w-full mt-4 py-3 bg-[var(--color-ink)] text-white rounded-full font-medium hover:bg-black transition-colors flex items-center justify-center gap-2"
@@ -122,13 +146,111 @@ export function CheckoutModal({ isOpen, onClose, cartItems, onSubmit }: Checkout
                     </button>
                   </div>
                 ) : (
-                  /* Checkout form */
                   <>
-                    <div className="mb-8 bg-[var(--color-nude)] p-4 rounded-2xl border border-[var(--color-nude-dark)]">
-                      <p className="text-sm text-[var(--color-ink-light)] mb-2">Resumo ({cartItems.length} itens)</p>
-                      <div className="flex justify-between items-end">
+                    {/* Summary */}
+                    <div className="mb-6 bg-[var(--color-nude)] p-4 rounded-2xl border border-[var(--color-nude-dark)] space-y-3">
+                      <p className="text-sm text-[var(--color-ink-light)]">Resumo ({cartItems.length} {cartItems.length === 1 ? 'item' : 'itens'})</p>
+
+                      {cartItems.map((item) => {
+                        const sel = partialSelections[item.id];
+                        const isPartial = !!(sel && sel > 0);
+                        const hasPartialOption = !!(item.allowPartial && item.totalParts && item.totalParts > 1);
+                        const isExpanded = expandedPartial === item.id;
+
+                        return (
+                          <div key={item.id}>
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="text-sm text-[var(--color-ink)] line-clamp-1 flex-1">{item.title}</span>
+                              <span className="text-sm font-medium text-[var(--color-sage-dark)] shrink-0">
+                                {fmt(effectivePrice(item))}
+                                {isPartial && (
+                                  <span className="ml-1 text-xs text-[var(--color-ink-light)]">
+                                    ({sel}/{item.totalParts})
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+
+                            {/* Partial option button — only for eligible items */}
+                            {hasPartialOption && (
+                              <div className="mt-1.5">
+                                {!isExpanded ? (
+                                  <button
+                                    onClick={() => setExpandedPartial(item.id)}
+                                    className="text-xs text-[var(--color-ink-light)] hover:text-[var(--color-sage-dark)] flex items-center gap-1 transition-colors"
+                                  >
+                                    <ChevronDown className="w-3 h-3" />
+                                    {isPartial
+                                      ? `Alterar contribuição parcial`
+                                      : `Contribuir com uma parte deste presente`}
+                                  </button>
+                                ) : (
+                                  <div className="mt-2 p-3 bg-white rounded-xl border border-[var(--color-nude-dark)] space-y-1.5">
+                                    <p className="text-xs font-medium text-[var(--color-ink)] mb-2">
+                                      Escolha quantas partes deseja presentear:
+                                    </p>
+
+                                    {/* Full gift option */}
+                                    <button
+                                      onClick={() => {
+                                        setPartialSelections((prev) => {
+                                          const next = { ...prev };
+                                          delete next[item.id];
+                                          return next;
+                                        });
+                                        setExpandedPartial(null);
+                                      }}
+                                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm border transition-colors ${
+                                        !isPartial
+                                          ? 'border-[var(--color-sage)] bg-[var(--color-sage)]/10 text-[var(--color-sage-dark)] font-medium'
+                                          : 'border-[var(--color-nude-dark)] hover:border-[var(--color-sage)] text-[var(--color-ink)]'
+                                      }`}
+                                    >
+                                      <span>Presente completo</span>
+                                      <span className="font-medium">{fmt(item.price)}</span>
+                                    </button>
+
+                                    {/* Partial options: 1 to totalParts-1 */}
+                                    {Array.from({ length: item.totalParts! - 1 }, (_, i) => i + 1).map((n) => {
+                                      const partPrice = (item.price / item.totalParts!) * n;
+                                      const isSelected = sel === n;
+                                      return (
+                                        <button
+                                          key={n}
+                                          onClick={() => {
+                                            setPartialSelections((prev) => ({ ...prev, [item.id]: n }));
+                                            setExpandedPartial(null);
+                                          }}
+                                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm border transition-colors ${
+                                            isSelected
+                                              ? 'border-[var(--color-sage)] bg-[var(--color-sage)]/10 text-[var(--color-sage-dark)] font-medium'
+                                              : 'border-[var(--color-nude-dark)] hover:border-[var(--color-sage)] text-[var(--color-ink)]'
+                                          }`}
+                                        >
+                                          <span>{n}/{item.totalParts} {n === 1 ? 'parte' : 'partes'}</span>
+                                          <span className="font-medium">{fmt(partPrice)}</span>
+                                        </button>
+                                      );
+                                    })}
+
+                                    <button
+                                      onClick={() => setExpandedPartial(null)}
+                                      className="w-full text-xs text-center text-[var(--color-ink-light)] hover:text-[var(--color-ink)] py-1 transition-colors"
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      <div className="flex justify-between items-end pt-2 border-t border-[var(--color-nude-dark)]">
+                        <span className="text-sm text-[var(--color-ink-light)]">Total</span>
                         <span className="font-serif text-3xl text-[var(--color-sage-dark)]">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}
+                          {fmt(total)}
                         </span>
                       </div>
                     </div>
@@ -167,6 +289,7 @@ export function CheckoutModal({ isOpen, onClose, cartItems, onSubmit }: Checkout
                     {name.trim() ? (
                       <div className="mt-4">
                         <Payment
+                          key={total}
                           initialization={initialization}
                           customization={customization as any}
                           onSubmit={handlePaymentSubmit}

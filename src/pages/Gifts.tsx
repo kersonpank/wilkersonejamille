@@ -49,14 +49,14 @@ export function Gifts() {
     setCart(cart.filter((item) => item.id !== id));
   };
 
-  const handleCheckoutSubmit = async (data: { name: string; message: string; method: string; paymentId: string; status: string; netAmount?: number | null }) => {
+  const handleCheckoutSubmit = async (data: { name: string; message: string; method: string; paymentId: string; status: string; netAmount?: number | null; amounts?: Record<string, number> }) => {
     try {
       for (const item of cart) {
         const contribution: Record<string, any> = {
           giftId: item.id,
           guestName: data.name,
           message: data.message,
-          amount: item.price,
+          amount: data.amounts?.[item.id] ?? item.price,
           paymentMethod: data.method,
           paymentId: data.paymentId,
           status: data.status,

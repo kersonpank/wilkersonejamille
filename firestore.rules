@@ -99,7 +99,9 @@ service cloud.firestore {
              (!( 'originalLink' in request.resource.data ) || (isValidUrl(request.resource.data.originalLink) && request.resource.data.originalLink.size() <= 1000)) &&
              request.resource.data.status in ['available', 'reserved', 'gifted'] &&
              request.resource.data.createdAt is timestamp &&
-             request.resource.data.authorUid is string;
+             request.resource.data.authorUid is string &&
+             (!('allowPartial' in request.resource.data) || request.resource.data.allowPartial is bool) &&
+             (!('totalParts' in request.resource.data) || (request.resource.data.totalParts is int && request.resource.data.totalParts >= 2 && request.resource.data.totalParts <= 10));
     }
 
     function isValidContribution() {

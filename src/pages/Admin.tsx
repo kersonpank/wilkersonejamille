@@ -24,6 +24,8 @@ export function Admin() {
     imageUrl: '',
     originalLink: '',
     status: 'available' as 'available' | 'reserved' | 'gifted',
+    allowPartial: false,
+    totalParts: '',
   });
 
   const [activeTab, setActiveTab] = useState<'gifts' | 'payments' | 'events'>('gifts');
@@ -151,6 +153,8 @@ export function Admin() {
         imageUrl: data.imageUrl || '',
         originalLink: linkInput,
         status: 'available',
+        allowPartial: false,
+        totalParts: '',
       });
 
       toast.success('Dados extraídos com sucesso! Revise antes de salvar.');
@@ -167,6 +171,7 @@ export function Admin() {
     if (!user) return;
 
     try {
+      const parsedTotalParts = parseInt(formData.totalParts);
       await addDoc(collection(db, 'gifts'), {
         title: formData.title,
         price: parseFloat(formData.price),
@@ -176,6 +181,9 @@ export function Admin() {
         status: formData.status,
         createdAt: serverTimestamp(),
         authorUid: user.uid,
+        ...(formData.allowPartial && parsedTotalParts > 1
+          ? { allowPartial: true, totalParts: parsedTotalParts }
+          : {}),
       });
 
       toast.success('Presente salvo na vitrine!');
@@ -186,6 +194,8 @@ export function Admin() {
         imageUrl: '',
         originalLink: '',
         status: 'available',
+        allowPartial: false,
+        totalParts: '',
       });
       setLinkInput('');
     } catch (error) {
@@ -1078,6 +1088,44 @@ export function Admin() {
                     </div>
                   </div>
 
+                  {/* Partial gifting */}
+                  <div className="mt-4 p-4 rounded-xl border border-[var(--color-nude-dark)] bg-gray-50/50">
+                    <label className="flex items-center gap-3 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={formData.allowPartial}
+                        onChange={(e) => setFormData({ ...formData, allowPartial: e.target.checked, totalParts: '' })}
+                        className="w-4 h-4 rounded accent-[var(--color-sage)]"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-[var(--color-ink)]">Permitir presente parcial</p>
+                        <p className="text-xs text-[var(--color-ink-light)]">Convidados poderão contribuir com uma fração do valor</p>
+                      </div>
+                    </label>
+                    {formData.allowPartial && (
+                      <div className="mt-3">
+                        <label className="block text-xs font-medium text-[var(--color-ink)] mb-1">
+                          Dividir em quantas partes iguais? *
+                        </label>
+                        <input
+                          type="number"
+                          min={2}
+                          max={10}
+                          required={formData.allowPartial}
+                          value={formData.totalParts}
+                          onChange={(e) => setFormData({ ...formData, totalParts: e.target.value })}
+                          placeholder="Ex: 3"
+                          className="w-32 px-3 py-2 text-sm rounded-lg border border-[var(--color-nude-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] bg-white"
+                        />
+                        {formData.totalParts && parseInt(formData.totalParts) > 1 && formData.price && (
+                          <p className="text-xs text-[var(--color-sage-dark)] mt-1.5">
+                            Cada parte = {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(formData.price) / parseInt(formData.totalParts))}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   {/* Image Preview */}
                   {formData.imageUrl && (
                     <div className="mt-6">
@@ -1121,6 +1169,11 @@ export function Admin() {
                         <h4 className="font-medium text-[var(--color-ink)] text-sm truncate">{gift.title}</h4>
                         <p className="text-[var(--color-sage-dark)] font-medium mt-1 text-sm">
                           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(gift.price)}
+                          {gift.allowPartial && gift.totalParts && (
+                            <span className="ml-2 text-xs text-[var(--color-sage-dark)] bg-[var(--color-sage)]/10 px-1.5 py-0.5 rounded-full">
+                              ✦ {gift.totalParts}x
+                            </span>
+                          )}
                         </p>
                       </div>
                       

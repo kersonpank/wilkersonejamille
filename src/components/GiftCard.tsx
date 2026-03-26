@@ -11,6 +11,8 @@ export interface Gift {
   status: 'available' | 'reserved' | 'gifted';
   createdAt: any;
   authorUid: string;
+  allowPartial?: boolean;
+  totalParts?: number;
 }
 
 interface GiftCardProps {
@@ -45,6 +47,11 @@ export function GiftCard({ gift, onSelect }: GiftCardProps) {
       </div>
       <div className="p-4 sm:p-6 flex flex-col flex-grow">
         <h3 className="font-serif text-base sm:text-lg text-[var(--color-ink)] mb-2 line-clamp-2">{gift.title}</h3>
+        {gift.allowPartial && gift.totalParts && gift.totalParts > 1 && (
+          <span className="inline-flex items-center gap-1 text-xs text-[var(--color-sage-dark)] bg-[var(--color-sage)]/10 px-2 py-0.5 rounded-full mb-2 w-fit">
+            ✦ Pode ser presenteado em partes
+          </span>
+        )}
         <p className="text-sm text-[var(--color-ink-light)] mb-4 flex-grow line-clamp-2">
           {gift.description}
         </p>
