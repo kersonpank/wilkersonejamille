@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Trash2, Plus } from 'lucide-react';
+import { X, Trash2, Plus, ChevronDown } from 'lucide-react';
 import { Gift } from './GiftCard';
+
+const fmt = (v: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
 interface CartSidebarProps {
   isOpen: boolean;
@@ -9,10 +12,22 @@ interface CartSidebarProps {
   cartItems: Gift[];
   onRemove: (id: string) => void;
   onCheckout: () => void;
+  partialSelections: Record<string, number>;
+  onPartialChange: (giftId: string, parts: number) => void;
 }
 
-export function CartSidebar({ isOpen, onClose, cartItems, onRemove, onCheckout }: CartSidebarProps) {
-  const total = cartItems.reduce((acc, item) => acc + item.price, 0);
+export function CartSidebar({ isOpen, onClose, cartItems, onRemove, onCheckout, partialSelections, onPartialChange }: CartSidebarProps) {
+  const [expandedPartial, setExpandedPartial] = useState<string | null>(null);
+
+  const effectivePrice = (item: Gift) => {
+    const sel = partialSelections[item.id];
+    if (item.allowPartial && item.totalParts && sel && sel > 0) {
+      return (item.price / item.totalParts) * sel;
+    }
+    return item.price;
+  };
+
+  const total = cartItems.reduce((acc, item) => acc + effectivePrice(item), 0);
 
   return (
     <AnimatePresence>
@@ -39,7 +54,7 @@ export function CartSidebar({ isOpen, onClose, cartItems, onRemove, onCheckout }
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {cartItems.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center space-y-4 text-[var(--color-ink-light)]">
                   <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm">
@@ -48,27 +63,109 @@ export function CartSidebar({ isOpen, onClose, cartItems, onRemove, onCheckout }
                   <p>Seu carrinho está vazio.</p>
                 </div>
               ) : (
-                cartItems.map((item) => (
-                  <div key={item.id} className="flex gap-4 bg-white p-4 rounded-xl shadow-sm border border-[var(--color-nude-dark)]">
-                    <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-50 shrink-0">
-                      <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    </div>
-                    <div className="flex-1 flex flex-col justify-between">
-                      <div>
-                        <h4 className="font-medium text-[var(--color-ink)] line-clamp-2 text-sm">{item.title}</h4>
-                        <p className="text-[var(--color-sage-dark)] font-medium mt-1">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}
-                        </p>
+                cartItems.map((item) => {
+                  const sel = partialSelections[item.id];
+                  const isPartial = !!(sel && sel > 0);
+                  const hasPartialOption = !!(item.allowPartial && item.totalParts && item.totalParts > 1);
+                  const isExpanded = expandedPartial === item.id;
+
+                  return (
+                    <div key={item.id} className="bg-white rounded-xl shadow-sm border border-[var(--color-nude-dark)] overflow-hidden">
+                      <div className="flex gap-4 p-4">
+                        <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-50 shrink-0">
+                          <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        </div>
+                        <div className="flex-1 flex flex-col justify-between min-w-0">
+                          <div>
+                            <h4 className="font-medium text-[var(--color-ink)] line-clamp-2 text-sm">{item.title}</h4>
+                            <p className="text-[var(--color-sage-dark)] font-medium mt-1">
+                              {fmt(effectivePrice(item))}
+                              {isPartial && (
+                                <span className="ml-1.5 text-xs text-[var(--color-ink-light)] font-normal">
+                                  ({sel}/{item.totalParts} partes)
+                                </span>
+                              )}
+                            </p>
+                            {isPartial && (
+                              <p className="text-xs text-[var(--color-ink-light)] line-through mt-0.5">
+                                {fmt(item.price)}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => onRemove(item.id)}
+                            className="text-xs text-red-400 hover:text-red-600 self-start flex items-center gap-1 mt-2 transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" /> Remover
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        onClick={() => onRemove(item.id)}
-                        className="text-xs text-red-400 hover:text-red-600 self-start flex items-center gap-1 mt-2 transition-colors"
-                      >
-                        <Trash2 className="w-3 h-3" /> Remover
-                      </button>
+
+                      {/* Partial option — only for eligible items */}
+                      {hasPartialOption && (
+                        <div className="border-t border-[var(--color-nude-dark)]">
+                          {!isExpanded ? (
+                            <button
+                              onClick={() => setExpandedPartial(item.id)}
+                              className="w-full flex items-center gap-1.5 px-4 py-2.5 text-xs text-[var(--color-ink-light)] hover:text-[var(--color-sage-dark)] hover:bg-[var(--color-nude)] transition-colors"
+                            >
+                              <ChevronDown className="w-3.5 h-3.5 shrink-0" />
+                              {isPartial
+                                ? `Alterar: presenteando ${sel}/${item.totalParts} partes`
+                                : 'Prefere contribuir com uma parte deste presente?'}
+                            </button>
+                          ) : (
+                            <div className="p-3 bg-[var(--color-nude)]/60 space-y-1.5">
+                              <p className="text-xs font-medium text-[var(--color-ink)] mb-2">
+                                Quantas partes deseja presentear?
+                              </p>
+
+                              {/* Full gift */}
+                              <button
+                                onClick={() => { onPartialChange(item.id, 0); setExpandedPartial(null); }}
+                                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs border transition-colors ${
+                                  !isPartial
+                                    ? 'border-[var(--color-sage)] bg-[var(--color-sage)]/10 text-[var(--color-sage-dark)] font-medium'
+                                    : 'border-[var(--color-nude-dark)] bg-white hover:border-[var(--color-sage)] text-[var(--color-ink)]'
+                                }`}
+                              >
+                                <span>Presente completo</span>
+                                <span className="font-medium">{fmt(item.price)}</span>
+                              </button>
+
+                              {/* Partial options */}
+                              {Array.from({ length: item.totalParts! - 1 }, (_, i) => i + 1).map((n) => {
+                                const partPrice = (item.price / item.totalParts!) * n;
+                                const isSelected = sel === n;
+                                return (
+                                  <button
+                                    key={n}
+                                    onClick={() => { onPartialChange(item.id, n); setExpandedPartial(null); }}
+                                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs border transition-colors ${
+                                      isSelected
+                                        ? 'border-[var(--color-sage)] bg-[var(--color-sage)]/10 text-[var(--color-sage-dark)] font-medium'
+                                        : 'border-[var(--color-nude-dark)] bg-white hover:border-[var(--color-sage)] text-[var(--color-ink)]'
+                                    }`}
+                                  >
+                                    <span>{n}/{item.totalParts} {n === 1 ? 'parte' : 'partes'}</span>
+                                    <span className="font-medium">{fmt(partPrice)}</span>
+                                  </button>
+                                );
+                              })}
+
+                              <button
+                                onClick={() => setExpandedPartial(null)}
+                                className="w-full text-center text-xs text-[var(--color-ink-light)] hover:text-[var(--color-ink)] py-1 transition-colors"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
@@ -77,11 +174,10 @@ export function CartSidebar({ isOpen, onClose, cartItems, onRemove, onCheckout }
                 <div className="flex justify-between items-center mb-5">
                   <span className="text-[var(--color-ink-light)]">Subtotal</span>
                   <span className="font-serif text-2xl text-[var(--color-ink)]">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}
+                    {fmt(total)}
                   </span>
                 </div>
 
-                {/* Nudge sutil para aumentar o ticket */}
                 {cartItems.length === 1 && (
                   <p className="text-xs text-[var(--color-ink-light)] text-center mb-3 leading-relaxed">
                     Cada presente faz parte da nossa história. 💛<br />

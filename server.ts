@@ -176,6 +176,9 @@ async function startServer() {
   const app = express();
   const PORT = parseInt(process.env.PORT || '3000');
 
+  // Diagnóstico de configuração
+  console.log('[Config] GEMINI_API_KEY:', process.env.GEMINI_API_KEY ? '✓ configurada' : '✗ ausente — extração usará apenas Cheerio');
+
   app.use(express.json());
 
   // API routes FIRST
@@ -451,10 +454,11 @@ NÃO invente imageUrl. Retorne somente o JSON, sem markdown, sem texto adicional
         console.log('[Gemini] raw response:', aiResponse.text?.slice(0, 300));
         const rawText = (aiResponse.text || '').replace(/```json|```/g, '').trim();
         const aiData = JSON.parse(rawText || '{}');
-        // Gemini overrides blanks, Cheerio values take priority when already set
-        if (!title && aiData.title) title = String(aiData.title).trim();
-        if (price === null && aiData.price != null) price = parseFloat(String(aiData.price)) || null;
-        if (!description && aiData.description) description = String(aiData.description).trim().slice(0, 300);
+        // Gemini is more accurate than Cheerio for JS-heavy/bot-protected sites
+        // Override title and price always; only fill imageUrl if Cheerio didn't get one
+        if (aiData.title) title = String(aiData.title).trim();
+        if (aiData.price != null) price = parseFloat(String(aiData.price)) || null;
+        if (aiData.description) description = String(aiData.description).trim().slice(0, 300);
         if (!imageUrl && aiData.imageUrl) imageUrl = String(aiData.imageUrl).trim();
       } catch (geminiError) {
         console.error('[Gemini] error:', geminiError);

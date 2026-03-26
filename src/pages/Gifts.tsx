@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom';
 export function Gifts() {
   const [gifts, setGifts] = useState<Gift[]>([]);
   const [cart, setCart] = useState<Gift[]>([]);
+  const [partialSelections, setPartialSelections] = useState<Record<string, number>>({});
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -36,6 +37,25 @@ export function Gifts() {
     return () => unsubscribe();
   }, []);
 
+  const effectivePrice = (item: Gift) => {
+    const sel = partialSelections[item.id];
+    if (item.allowPartial && item.totalParts && sel && sel > 0) {
+      return (item.price / item.totalParts) * sel;
+    }
+    return item.price;
+  };
+
+  const handlePartialChange = (giftId: string, parts: number) => {
+    setPartialSelections((prev) => {
+      if (parts === 0) {
+        const next = { ...prev };
+        delete next[giftId];
+        return next;
+      }
+      return { ...prev, [giftId]: parts };
+    });
+  };
+
   const handleSelectGift = (gift: Gift) => {
     if (cart.find((item) => item.id === gift.id)) {
       toast.info('Este presente já está no seu carrinho.');
@@ -46,17 +66,22 @@ export function Gifts() {
   };
 
   const handleRemoveFromCart = (id: string) => {
-    setCart(cart.filter((item) => item.id !== id));
+    setCart((prev) => prev.filter((item) => item.id !== id));
+    setPartialSelections((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   };
 
-  const handleCheckoutSubmit = async (data: { name: string; message: string; method: string; paymentId: string; status: string; netAmount?: number | null; amounts?: Record<string, number> }) => {
+  const handleCheckoutSubmit = async (data: { name: string; message: string; method: string; paymentId: string; status: string; netAmount?: number | null }) => {
     try {
       for (const item of cart) {
         const contribution: Record<string, any> = {
           giftId: item.id,
           guestName: data.name,
           message: data.message,
-          amount: data.amounts?.[item.id] ?? item.price,
+          amount: effectivePrice(item),
           paymentMethod: data.method,
           paymentId: data.paymentId,
           status: data.status,
@@ -70,17 +95,16 @@ export function Gifts() {
         duration: 5000,
       });
 
-      // Se o pagamento já veio aprovado (PIX imediato, alguns cartões),
-      // dispara a notificação direto — sem depender do webhook assíncrono do Mercado Pago
       if (data.status === 'approved') {
         fetch('/api/notify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ paymentId: data.paymentId }),
-        }).catch(() => { /* falha silenciosa — não afeta o fluxo do usuário */ });
+        }).catch(() => {});
       }
 
       setCart([]);
+      setPartialSelections({});
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'contributions');
     }
@@ -92,7 +116,7 @@ export function Gifts() {
       <header className="fixed top-0 left-0 right-0 z-30 bg-[var(--color-nude)]/80 backdrop-blur-md border-b border-[var(--color-nude-dark)]">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <Link to="/" className="font-serif text-2xl tracking-wide text-[var(--color-ink)]">W & J</Link>
-          
+
           <nav className="hidden md:flex items-center gap-8">
             <Link to="/" className="text-[var(--color-ink)] hover:text-[var(--color-sage-dark)] font-medium transition-colors">Home</Link>
             <Link to="/presentes" className="text-[var(--color-sage-dark)] font-medium transition-colors">Lista de Presentes</Link>
@@ -158,6 +182,8 @@ export function Gifts() {
           setIsCartOpen(false);
           setIsCheckoutOpen(true);
         }}
+        partialSelections={partialSelections}
+        onPartialChange={handlePartialChange}
       />
 
       <CheckoutModal
@@ -165,6 +191,8 @@ export function Gifts() {
         onClose={() => { setIsCheckoutOpen(false); setIsCartOpen(false); }}
         cartItems={cart}
         onSubmit={handleCheckoutSubmit}
+        partialSelections={partialSelections}
+        onPartialChange={handlePartialChange}
       />
     </div>
   );

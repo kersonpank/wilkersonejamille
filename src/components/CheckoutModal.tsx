@@ -20,17 +20,16 @@ interface CheckoutModalProps {
     paymentId: string;
     status: string;
     netAmount?: number | null;
-    amounts?: Record<string, number>;
   }) => void;
+  partialSelections: Record<string, number>;
+  onPartialChange: (giftId: string, parts: number) => void;
 }
 
-export function CheckoutModal({ isOpen, onClose, cartItems, onSubmit }: CheckoutModalProps) {
+export function CheckoutModal({ isOpen, onClose, cartItems, onSubmit, partialSelections, onPartialChange }: CheckoutModalProps) {
   const [name, setName] = useState('');
   const [message, setMessage] = useState('');
   const [confirmedPaymentId, setConfirmedPaymentId] = useState<string | null>(null);
   const [confirmedStatus, setConfirmedStatus] = useState<string>('');
-  // giftId → number of parts selected (0 or undefined = full price)
-  const [partialSelections, setPartialSelections] = useState<Record<string, number>>({});
   const [expandedPartial, setExpandedPartial] = useState<string | null>(null);
 
   const effectivePrice = (item: Gift) => {
@@ -48,7 +47,6 @@ export function CheckoutModal({ isOpen, onClose, cartItems, onSubmit }: Checkout
     setConfirmedStatus('');
     setName('');
     setMessage('');
-    setPartialSelections({});
     setExpandedPartial(null);
     onClose();
   };
@@ -66,9 +64,6 @@ export function CheckoutModal({ isOpen, onClose, cartItems, onSubmit }: Checkout
             console.error("Payment error:", response.detail);
             reject();
           } else {
-            const amounts = Object.fromEntries(
-              cartItems.map((item) => [item.id, effectivePrice(item)])
-            );
             onSubmit({
               name,
               message,
@@ -76,7 +71,6 @@ export function CheckoutModal({ isOpen, onClose, cartItems, onSubmit }: Checkout
               paymentId: String(response.id),
               status: response.status,
               netAmount: response.net_received_amount ?? null,
-              amounts,
             });
             setConfirmedPaymentId(String(response.id));
             setConfirmedStatus(response.status);
@@ -192,14 +186,7 @@ export function CheckoutModal({ isOpen, onClose, cartItems, onSubmit }: Checkout
 
                                     {/* Full gift option */}
                                     <button
-                                      onClick={() => {
-                                        setPartialSelections((prev) => {
-                                          const next = { ...prev };
-                                          delete next[item.id];
-                                          return next;
-                                        });
-                                        setExpandedPartial(null);
-                                      }}
+                                      onClick={() => { onPartialChange(item.id, 0); setExpandedPartial(null); }}
                                       className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm border transition-colors ${
                                         !isPartial
                                           ? 'border-[var(--color-sage)] bg-[var(--color-sage)]/10 text-[var(--color-sage-dark)] font-medium'
@@ -217,10 +204,7 @@ export function CheckoutModal({ isOpen, onClose, cartItems, onSubmit }: Checkout
                                       return (
                                         <button
                                           key={n}
-                                          onClick={() => {
-                                            setPartialSelections((prev) => ({ ...prev, [item.id]: n }));
-                                            setExpandedPartial(null);
-                                          }}
+                                          onClick={() => { onPartialChange(item.id, n); setExpandedPartial(null); }}
                                           className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm border transition-colors ${
                                             isSelected
                                               ? 'border-[var(--color-sage)] bg-[var(--color-sage)]/10 text-[var(--color-sage-dark)] font-medium'
