@@ -395,6 +395,13 @@ async function startServer() {
       return res.status(400).json({ error: "URL is required" });
     }
 
+    let title = '';
+    let price: number | null = null;
+    let description = '';
+    let imageUrl = '';
+    let fetchSucceeded = false;
+
+    // Layer 1: free HTML scraping (may fail for sites that block bots)
     try {
       const response = await fetch(url, {
         headers: {
@@ -404,64 +411,62 @@ async function startServer() {
         }
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch URL: ${response.statusText}`);
+      if (response.ok) {
+        fetchSucceeded = true;
+        const html = await response.text();
+        const $ = cheerio.load(html);
+        ({ title, price, description, imageUrl } = extractWithCheerio($, url));
+      } else {
+        console.log(`[Extract] Layer 1 HTTP ${response.status} — will try Gemini`);
       }
+    } catch (fetchError) {
+      console.log('[Extract] Layer 1 fetch blocked/failed — will try Gemini:', (fetchError as Error).message);
+    }
 
-      const html = await response.text();
-      const $ = cheerio.load(html);
+    // Layer 2: Gemini with urlContext — fetches via Google infra, handles JS-heavy and bot-protected sites
+    // Fires when: Layer 1 failed entirely OR any key field is missing
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const needsGemini = !fetchSucceeded || !title || price === null || !imageUrl;
+    if (geminiKey && needsGemini) {
+      try {
+        const { GoogleGenAI } = await import('@google/genai');
+        const ai = new GoogleGenAI({ apiKey: geminiKey });
 
-      // Layer 1: free HTML scraping
-      let { title, price, description, imageUrl } = extractWithCheerio($, url);
-
-      // Layer 2: Gemini com urlContext — acessa e renderiza a URL real, usado quando scraping falha
-      // Sites como Mercado Livre, Shopee, etc. carregam dados via JS e o HTML estático fica vazio
-      const geminiKey = process.env.GEMINI_API_KEY;
-      if (geminiKey && price === null) {
-        try {
-          const { GoogleGenAI } = await import('@google/genai');
-          const ai = new GoogleGenAI({ apiKey: geminiKey });
-
-          const aiResponse = await ai.models.generateContent({
-            model: 'gemini-2.0-flash',
-            contents: `Acesse a URL e extraia as informações reais do produto: ${url}.
+        const aiResponse = await ai.models.generateContent({
+          model: 'gemini-2.0-flash',
+          contents: `Acesse a URL e extraia as informações reais do produto: ${url}.
 Retorne APENAS um JSON válido com estas chaves exatas:
 {"title":"nome do produto","price":1299.90,"description":"descrição breve","imageUrl":"https://..."}
 - title: nome exato do produto (string)
 - price: preço em BRL como número puro, sem R$ (number)
 - description: descrição breve, máx 200 chars (string)
-- imageUrl: URL absoluta real da imagem principal (string, vazia "" se não encontrar)
+- imageUrl: URL absoluta e pública da imagem principal do produto (string, vazia "" se não encontrar)
 NÃO invente imageUrl. Retorne somente o JSON, sem markdown, sem texto adicional.`,
-            config: {
-              tools: [{ urlContext: {} }],
-              responseMimeType: 'application/json',
-            },
-          });
+          config: {
+            tools: [{ urlContext: {} }],
+            responseMimeType: 'application/json',
+          },
+        });
 
-          console.log('[Gemini] raw response:', aiResponse.text?.slice(0, 300));
-          const rawText = (aiResponse.text || '').replace(/```json|```/g, '').trim();
-          const aiData = JSON.parse(rawText || '{}');
-          // Gemini com urlContext é mais confiável que scraping estático para sites JS-heavy
-          if (aiData.title) title = String(aiData.title).trim();
-          if (aiData.price != null) price = parseFloat(String(aiData.price)) || null;
-          if (aiData.description) description = String(aiData.description).trim().slice(0, 300);
-          // Preferir imageUrl do Cheerio (já validada como URL absoluta), cair no Gemini se vazia
-          if (!imageUrl && aiData.imageUrl) imageUrl = String(aiData.imageUrl).trim();
-        } catch (geminiError) {
-          console.error('[Gemini] fallback error:', geminiError);
-        }
+        console.log('[Gemini] raw response:', aiResponse.text?.slice(0, 300));
+        const rawText = (aiResponse.text || '').replace(/```json|```/g, '').trim();
+        const aiData = JSON.parse(rawText || '{}');
+        // Gemini overrides blanks, Cheerio values take priority when already set
+        if (!title && aiData.title) title = String(aiData.title).trim();
+        if (price === null && aiData.price != null) price = parseFloat(String(aiData.price)) || null;
+        if (!description && aiData.description) description = String(aiData.description).trim().slice(0, 300);
+        if (!imageUrl && aiData.imageUrl) imageUrl = String(aiData.imageUrl).trim();
+      } catch (geminiError) {
+        console.error('[Gemini] error:', geminiError);
       }
-
-      res.json({
-        title: title || '',
-        price: price ?? null,
-        description: description || '',
-        imageUrl: imageUrl || '',
-      });
-    } catch (error) {
-      console.error("Extraction error:", error);
-      res.status(500).json({ error: "Failed to extract data" });
     }
+
+    res.json({
+      title: title || '',
+      price: price ?? null,
+      description: description || '',
+      imageUrl: imageUrl || '',
+    });
   });
 
   // Image proxy — serves event image from our domain (WhatsApp/Facebook trust own-domain images more)

@@ -16,6 +16,7 @@ export function Admin() {
   // Form state
   const [linkInput, setLinkInput] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionResult, setExtractionResult] = useState<{ title: boolean; price: boolean; imageUrl: boolean } | null>(null);
   
   const [formData, setFormData] = useState({
     title: '',
@@ -157,7 +158,17 @@ export function Admin() {
         totalParts: '',
       });
 
-      toast.success('Dados extraídos com sucesso! Revise antes de salvar.');
+      setExtractionResult({
+        title: !!data.title,
+        price: data.price != null,
+        imageUrl: !!data.imageUrl,
+      });
+
+      if (!data.imageUrl) {
+        toast.success('Dados extraídos! ⚠️ Imagem não encontrada — cole a URL da imagem manualmente.');
+      } else {
+        toast.success('Dados extraídos com sucesso! Revise antes de salvar.');
+      }
     } catch (error) {
       console.error('Erro ao extrair dados:', error);
       toast.error('Falha ao extrair dados do link. Preencha manualmente.');
@@ -198,6 +209,7 @@ export function Admin() {
         totalParts: '',
       });
       setLinkInput('');
+      setExtractionResult(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'gifts');
     }
@@ -1013,7 +1025,7 @@ export function Admin() {
                       <input
                         type="url"
                         value={linkInput}
-                        onChange={(e) => setLinkInput(e.target.value)}
+                        onChange={(e) => { setLinkInput(e.target.value); setExtractionResult(null); }}
                         placeholder="https://..."
                         className="w-full pl-10 pr-4 py-3 rounded-xl border border-[var(--color-nude-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] bg-gray-50/50"
                       />
@@ -1042,14 +1054,23 @@ export function Admin() {
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-[var(--color-ink)] mb-2">Preço (R$) *</label>
+                      <label className="block text-sm font-medium text-[var(--color-ink)] mb-2 flex items-center gap-2">
+                        Preço (R$) *
+                        {extractionResult && !extractionResult.price && (
+                          <span className="text-xs font-normal text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">⚠️ Preencha</span>
+                        )}
+                      </label>
                       <input
                         type="number"
                         step="0.01"
                         required
                         value={formData.price}
                         onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                        className="w-full px-4 py-3 rounded-xl border border-[var(--color-nude-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] bg-gray-50/50"
+                        className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] bg-gray-50/50 transition-colors ${
+                          extractionResult && !extractionResult.price && !formData.price
+                            ? 'border-amber-400 bg-amber-50/30'
+                            : 'border-[var(--color-nude-dark)]'
+                        }`}
                       />
                     </div>
 
@@ -1067,13 +1088,30 @@ export function Admin() {
                     </div>
 
                     <div className="sm:col-span-2">
-                      <label className="block text-sm font-medium text-[var(--color-ink)] mb-2">URL da Imagem *</label>
+                      <label className="block text-sm font-medium text-[var(--color-ink)] mb-2 flex items-center gap-2">
+                        URL da Imagem *
+                        {extractionResult && !extractionResult.imageUrl && (
+                          <span className="text-xs font-normal text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                            ⚠️ Não extraída — cole manualmente
+                          </span>
+                        )}
+                        {extractionResult && extractionResult.imageUrl && (
+                          <span className="text-xs font-normal text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                            ✓ Extraída
+                          </span>
+                        )}
+                      </label>
                       <input
                         type="url"
                         required
                         value={formData.imageUrl}
-                        onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                        className="w-full px-4 py-3 rounded-xl border border-[var(--color-nude-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] bg-gray-50/50"
+                        onChange={(e) => { setFormData({ ...formData, imageUrl: e.target.value }); setExtractionResult(prev => prev ? { ...prev, imageUrl: !!e.target.value } : prev); }}
+                        className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] bg-gray-50/50 transition-colors ${
+                          extractionResult && !extractionResult.imageUrl && !formData.imageUrl
+                            ? 'border-amber-400 bg-amber-50/30'
+                            : 'border-[var(--color-nude-dark)]'
+                        }`}
+                        placeholder="https://..."
                       />
                     </div>
 
